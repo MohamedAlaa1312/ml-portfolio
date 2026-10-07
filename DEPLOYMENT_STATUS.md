@@ -29,7 +29,7 @@ This document provides the authoritative tracking record of the production deplo
 
 | Environment Target | URL / Value | Status |
 | :--- | :--- | :--- |
-| **Canonical Site URL** | `https://mohamedkhaled.dev` (or platform auto-domain `https://ml-portfolio-*.vercel.app`) | Configured via `NEXT_PUBLIC_SITE_URL` |
+| **Production Site URL** | `https://ml-portfolio-theta.vercel.app` | Verified Assigned Vercel Domain |
 | **Supabase Project** | Production PostgreSQL (`auth.users`, 11 Application Tables, RLS Active) | Ready via `supabase/schema.sql` |
 | **Storage Buckets** | `portfolio-media` (Public Read), `portfolio-private` (Admin Only) | Configured in DDL |
 | **Admin Authorization** | `public.admin_users` + `app_metadata.role = 'admin'` | Ready via `supabase/authorize_admin.sql` |

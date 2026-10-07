@@ -72,3 +72,5 @@ desktop.ini
 # Local Media Uploads (Preserve directory structure, ignore uploaded files)
 /public/uploads/*
 !/public/uploads/.gitkeep
+
+.vercel
