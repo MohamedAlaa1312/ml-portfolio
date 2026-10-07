@@ -12,8 +12,8 @@ This document provides the authoritative tracking record of the production deplo
 | **Deployment Method** | GitHub-driven CI/CD Pipeline (`.github/workflows/deploy.yml` + Vercel / Next.js Native Serverless Hosting) |
 | **Source Branch** | `main` |
 | **Commit Reference** | `cf77261` (`docs(qa): add Phase 27 production QA and final release verification report`) |
-| **GitHub Remote** | Pending Remote Linkage (Local `main` ready to push) |
-| **Deployment Status** | Production Build & QA Verified; Pending GitHub Remote Push & Platform Link |
+| **GitHub Remote** | `https://github.com/MohamedAlaa1312/ml-portfolio` |
+| **Deployment Status** | Repository linked & prepared for GitHub-driven deployment pipeline |
 | **Runtime Version** | Node.js v20+ LTS (`.nvmrc` configured) / npm 10+ |
 | **Framework Version** | Next.js 16.3.5 App Router + React 19 |
 | **Production Build Result** | **PASSED** (0 Errors, 20 Static & Dynamic App Router routes compiled cleanly) |
