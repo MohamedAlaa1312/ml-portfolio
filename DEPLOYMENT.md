@@ -97,17 +97,38 @@ In your Supabase Project Dashboard -> **Authentication** -> **URL Configuration*
 
 ## 7. GitHub Repository & CI Configuration
 
-1. Initialize or maintain the Git repository with the clean `.gitignore` provided.
-2. Ensure `.github/workflows/ci.yml` is enabled on your repository to automatically run:
-   - Dependency installation (`npm ci`)
-   - Typechecking (`npm run typecheck`)
-   - Linting (`npm run lint`)
-   - Production bundle compilation (`npm run build`)
-3. Never store secrets in GitHub Actions workflows or repository secrets unless explicitly needed for automated deployment.
+1. Initialize or maintain the Git repository on the `main` branch with the clean `.gitignore` provided.
+2. Enable automated CI/CD workflows:
+   - [`.github/workflows/ci.yml`](.github/workflows/ci.yml): Validates pull requests and commits (install, typecheck, lint, build).
+   - [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml): Executes production validation gates and deploys to hosting target.
+3. Configure GitHub Secrets in repository settings (**Settings** -> **Secrets and variables** -> **Actions**):
+   - `NEXT_PUBLIC_SUPABASE_URL`: Production Supabase endpoint.
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Public client Anon key.
+   - `NEXT_PUBLIC_SITE_URL`: Canonical production domain (e.g. `https://mohamedkhaled.dev`).
+   - `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` (if deploying via automated Vercel Action).
 
 ---
 
-## 8. Post-Deployment Verification (Smoke Tests)
+## 8. Rollback Procedures
+
+If an issue occurs in production:
+1. **Hosting Platform Instant Rollback**:
+   - Access the hosting dashboard (e.g., Vercel -> Deployments).
+   - Select the previous stable deployment and trigger **Instant Rollback**.
+2. **Git Commit Revert**:
+   - Revert the problematic commit locally:
+     ```bash
+     git revert <commit-hash>
+     git push origin main
+     ```
+   - Automated CI/CD will test and deploy the reverted stable build.
+3. **Database State Reversion**:
+   - Draft content can be atomically discarded from the Admin console at `/admin/publishing`.
+   - Theme settings can be discarded or republished from `/admin/themes`.
+
+---
+
+## 9. Post-Deployment Verification (Smoke Tests)
 
 After deploying to production hosting:
 1. **Public Portfolio (`/`)**:

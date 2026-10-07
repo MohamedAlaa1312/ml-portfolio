@@ -131,6 +131,8 @@ Open [http://localhost:3000](http://localhost:3000) to view the public portfolio
 
 ---
 
-## 9. Deployment Preparation
+## 9. Production Deployment & Status
 
-Detailed production hosting, Supabase provisioning, and domain configuration instructions are provided in [DEPLOYMENT.md](file:///f:/internships%20and%20courses/portfolio%202/ml-portfolio/DEPLOYMENT.md) and [PRODUCTION_CHECKLIST.md](file:///f:/internships%20and%20courses/portfolio%202/ml-portfolio/PRODUCTION_CHECKLIST.md).
+Detailed production hosting architecture, Supabase provisioning, and domain configuration instructions are provided in [DEPLOYMENT.md](DEPLOYMENT.md) and [PRODUCTION_CHECKLIST.md](PRODUCTION_CHECKLIST.md).
+Current deployment record, environment bindings, and verification results are maintained in [DEPLOYMENT_STATUS.md](DEPLOYMENT_STATUS.md).
+
