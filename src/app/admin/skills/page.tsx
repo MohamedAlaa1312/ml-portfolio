@@ -8,6 +8,7 @@ import { SkillsManager } from '@/components/admin/skills/SkillsManager';
 import type { Skill, SkillCategory } from '@/lib/supabase/types';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export default async function AdminSkillsPage() {
   // 1. Server-Side Defense-in-Depth Authorization Check

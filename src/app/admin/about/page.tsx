@@ -9,6 +9,7 @@ import { AboutEditor } from '@/components/admin/AboutEditor';
 import type { Section } from '@/lib/supabase/types';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export default async function AdminAboutPage() {
   // 1. Server-Side Defense-in-Depth Authorization Check
@@ -34,7 +35,7 @@ export default async function AdminAboutPage() {
   // 3. Load Current About Section & Site Settings
   const [sections, siteSettings] = await Promise.all([
     AdminService.getAllSections().catch(() => [] as Section[]),
-    CmsService.getSiteSettings().catch(() => null),
+    AdminService.getSiteSettings().catch(() => null),
   ]);
 
   const aboutSection =

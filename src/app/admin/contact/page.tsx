@@ -7,6 +7,7 @@ import { AdminLayout } from '@/components/admin';
 import { ContactSocialManager } from '@/components/admin/contact';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export default async function AdminContactPage() {
   // 1. Server-Side Defense-in-Depth Authorization Check

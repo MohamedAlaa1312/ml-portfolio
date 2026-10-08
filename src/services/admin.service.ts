@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { DevFallbackStore } from '@/lib/store';
 import fs from 'fs';
 import path from 'path';
@@ -20,6 +21,29 @@ import type {
 } from '@/lib/supabase/types';
 import { parseSocialLinks } from '@/lib/social-utils';
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isValidUuid(id?: string | null): boolean {
+  return typeof id === 'string' && UUID_REGEX.test(id);
+}
+
+/**
+ * Resolves the database client for admin operations.
+ * Prioritizes createAdminClient() (Service Role) when configured on the server,
+ * safely bypassing RLS for authenticated administrative actions.
+ * Falls back to createClient() (user session cookie).
+ */
+async function getDbClient() {
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
+  if (serviceKey) {
+    try {
+      return createAdminClient();
+    } catch (err) {
+      console.warn('[AdminService] createAdminClient fallback notice:', err);
+    }
+  }
+  return await createClient();
+}
+
 /**
  * Server-Side Administrative Data Management Service.
  * All mutations require an authenticated session and are guarded by PostgreSQL RLS.
@@ -34,15 +58,22 @@ export const AdminService = {
       return DevFallbackStore.getAllSections();
     }
     try {
-      const supabase = await createClient();
+      const supabase = await getDbClient();
       const { data, error } = await supabase
         .from('sections')
         .select('*')
         .order('display_order', { ascending: true });
 
-      if (error) throw new Error(error.message);
-      return (data as Section[]) || [];
-    } catch {
+      if (error) {
+        console.error('[AdminService.getAllSections] DB error:', error.message);
+        return DevFallbackStore.getAllSections();
+      }
+      if (Array.isArray(data) && data.length > 0) {
+        return data as Section[];
+      }
+      return DevFallbackStore.getAllSections();
+    } catch (err) {
+      console.error('[AdminService.getAllSections] Exception:', err);
       return DevFallbackStore.getAllSections();
     }
   },
@@ -52,16 +83,22 @@ export const AdminService = {
       return DevFallbackStore.getSectionById(id);
     }
     try {
-      const supabase = await createClient();
-      const { data, error } = await supabase
-        .from('sections')
-        .select('*')
-        .or(`id.eq.${id},slug.eq.${id}`)
-        .maybeSingle();
+      const supabase = await getDbClient();
+      let query = supabase.from('sections').select('*');
+      if (isValidUuid(id)) {
+        query = query.or(`id.eq.${id},slug.eq.${id}`);
+      } else {
+        query = query.eq('slug', id);
+      }
+      const { data, error } = await query.maybeSingle();
 
-      if (error) throw new Error(error.message);
-      return (data as unknown as Section) || null;
-    } catch {
+      if (error) {
+        console.error('[AdminService.getSectionById] DB error:', error.message);
+        return DevFallbackStore.getSectionById(id);
+      }
+      return (data as unknown as Section) || DevFallbackStore.getSectionById(id);
+    } catch (err) {
+      console.error('[AdminService.getSectionById] Exception:', err);
       return DevFallbackStore.getSectionById(id);
     }
   },
@@ -71,16 +108,51 @@ export const AdminService = {
       return DevFallbackStore.upsertSection(section);
     }
     try {
-      const supabase = await createClient();
-      const { data, error } = await supabase
-        .from('sections')
-        .upsert(section as any)
-        .select()
-        .single();
+      const supabase = await getDbClient();
 
-      if (error) throw new Error(error.message);
-      return data as Section;
-    } catch {
+      // Check for existing section by valid UUID or by slug
+      let existingQuery = supabase.from('sections').select('id, slug').limit(1);
+      if (isValidUuid(section.id)) {
+        existingQuery = existingQuery.or(`id.eq.${section.id},slug.eq.${section.slug}`);
+      } else {
+        existingQuery = existingQuery.eq('slug', section.slug);
+      }
+      const { data: existingData } = await existingQuery.maybeSingle();
+      const existing = existingData as any;
+
+      const payload: any = {
+        ...section,
+        updated_at: new Date().toISOString(),
+      };
+      if (!isValidUuid(payload.id)) {
+        delete payload.id;
+      }
+
+      let res;
+      if (existing?.id) {
+        res = await (supabase as any)
+          .from('sections')
+          .update(payload)
+          .eq('id', existing.id)
+          .select()
+          .single();
+      } else {
+        res = await (supabase as any)
+          .from('sections')
+          .insert(payload)
+          .select()
+          .single();
+      }
+
+      if (res.error) {
+        console.error('[AdminService.upsertSection] DB error:', res.error.message);
+        throw new Error(res.error.message);
+      }
+      const resultData = res.data as Section;
+      DevFallbackStore.upsertSection(resultData);
+      return resultData;
+    } catch (err) {
+      console.error('[AdminService.upsertSection] Fatal error:', err);
       return DevFallbackStore.upsertSection(section);
     }
   },
@@ -90,17 +162,30 @@ export const AdminService = {
       return DevFallbackStore.updateSection(id, updates);
     }
     try {
-      const supabase = await createClient();
-      const { data, error } = await (supabase as any)
+      const supabase = await getDbClient();
+      let query = (supabase as any)
         .from('sections')
-        .update({ ...updates, updated_at: new Date().toISOString() })
-        .eq('id', id)
-        .select()
-        .single();
+        .update({ ...updates, updated_at: new Date().toISOString() });
 
-      if (error) throw new Error(error.message);
-      return (data as Section) || DevFallbackStore.updateSection(id, updates);
-    } catch {
+      if (isValidUuid(id)) {
+        query = query.eq('id', id);
+      } else {
+        query = query.eq('slug', id);
+      }
+      const { data, error } = await query.select().maybeSingle();
+
+      if (error) {
+        console.error('[AdminService.updateSection] DB error:', error.message);
+        return DevFallbackStore.updateSection(id, updates);
+      }
+      if (data) {
+        const res = data as Section;
+        DevFallbackStore.updateSection(res.id, updates);
+        return res;
+      }
+      return DevFallbackStore.updateSection(id, updates);
+    } catch (err) {
+      console.error('[AdminService.updateSection] Exception:', err);
       return DevFallbackStore.updateSection(id, updates);
     }
   },
@@ -114,7 +199,8 @@ export const AdminService = {
       if (!current) return null;
       const targetEnabled = enabled !== undefined ? enabled : !current.enabled;
       return await this.updateSection(id, { enabled: targetEnabled });
-    } catch {
+    } catch (err) {
+      console.error('[AdminService.toggleSection] Exception:', err);
       return DevFallbackStore.toggleSection(id, enabled);
     }
   },
@@ -125,10 +211,18 @@ export const AdminService = {
       return;
     }
     try {
-      const supabase = await createClient();
-      const { error } = await supabase.from('sections').delete().eq('id', id);
-      if (error) throw new Error(error.message);
-    } catch {
+      const supabase = await getDbClient();
+      let query = supabase.from('sections').delete();
+      if (isValidUuid(id)) {
+        query = query.eq('id', id);
+      } else {
+        query = query.eq('slug', id);
+      }
+      const { error } = await query;
+      if (error) console.error('[AdminService.deleteSection] DB error:', error.message);
+      DevFallbackStore.deleteSection(id);
+    } catch (err) {
+      console.error('[AdminService.deleteSection] Exception:', err);
       DevFallbackStore.deleteSection(id);
     }
   },
@@ -138,13 +232,19 @@ export const AdminService = {
       return DevFallbackStore.reorderSections(orderedIds);
     }
     try {
-      const supabase = await createClient();
-      const updates = orderedIds.map((id, index) =>
-        (supabase as any).from('sections').update({ display_order: index + 1 }).eq('id', id)
-      );
+      const supabase = await getDbClient();
+      const updates = orderedIds.map((id, index) => {
+        let q = (supabase as any).from('sections').update({ display_order: index + 1 });
+        if (isValidUuid(id)) {
+          return q.eq('id', id);
+        } else {
+          return q.eq('slug', id);
+        }
+      });
       await Promise.all(updates);
       return this.getAllSections();
-    } catch {
+    } catch (err) {
+      console.error('[AdminService.reorderSections] Exception:', err);
       return DevFallbackStore.reorderSections(orderedIds);
     }
   },
@@ -157,15 +257,22 @@ export const AdminService = {
       return DevFallbackStore.getAllProjects();
     }
     try {
-      const supabase = await createClient();
+      const supabase = await getDbClient();
       const { data, error } = await supabase
         .from('projects')
         .select('*')
         .order('display_order', { ascending: true });
 
-      if (error) throw new Error(error.message);
-      return (data as Project[]) || [];
-    } catch {
+      if (error) {
+        console.error('[AdminService.getAllProjects] DB error:', error.message);
+        return DevFallbackStore.getAllProjects();
+      }
+      if (Array.isArray(data) && data.length > 0) {
+        return data as Project[];
+      }
+      return DevFallbackStore.getAllProjects();
+    } catch (err) {
+      console.error('[AdminService.getAllProjects] Exception:', err);
       return DevFallbackStore.getAllProjects();
     }
   },
@@ -175,16 +282,22 @@ export const AdminService = {
       return DevFallbackStore.getProjectById(id);
     }
     try {
-      const supabase = await createClient();
-      const { data, error } = await supabase
-        .from('projects')
-        .select('*')
-        .or(`id.eq.${id},slug.eq.${id}`)
-        .maybeSingle();
+      const supabase = await getDbClient();
+      let query = supabase.from('projects').select('*');
+      if (isValidUuid(id)) {
+        query = query.or(`id.eq.${id},slug.eq.${id}`);
+      } else {
+        query = query.eq('slug', id);
+      }
+      const { data, error } = await query.maybeSingle();
 
-      if (error) throw new Error(error.message);
-      return (data as unknown as Project) || null;
-    } catch {
+      if (error) {
+        console.error('[AdminService.getProjectById] DB error:', error.message);
+        return DevFallbackStore.getProjectById(id);
+      }
+      return (data as unknown as Project) || DevFallbackStore.getProjectById(id);
+    } catch (err) {
+      console.error('[AdminService.getProjectById] Exception:', err);
       return DevFallbackStore.getProjectById(id);
     }
   },
@@ -194,7 +307,7 @@ export const AdminService = {
       return DevFallbackStore.upsertProject(project);
     }
     try {
-      const supabase = await createClient();
+      const supabase = await getDbClient();
       const payload: any = { ...project };
 
       if (!payload.slug && payload.title) {
@@ -204,27 +317,45 @@ export const AdminService = {
           .replace(/(^-|-$)/g, '');
       }
 
-      if (!payload.id) {
-        delete payload.id;
-        const { data, error } = await (supabase as any)
-          .from('projects')
-          .insert(payload)
-          .select()
-          .single();
-
-        if (error) throw new Error(error.message);
-        return data as Project;
+      // Check for existing project by UUID or slug
+      let existing: any = null;
+      if (isValidUuid(payload.id)) {
+        const { data } = await supabase.from('projects').select('id').eq('id', payload.id).maybeSingle();
+        existing = data;
+      } else if (payload.slug) {
+        const { data } = await supabase.from('projects').select('id').eq('slug', payload.slug).maybeSingle();
+        existing = data;
       }
 
-      const { data, error } = await supabase
-        .from('projects')
-        .upsert(payload)
-        .select()
-        .single();
+      if (!isValidUuid(payload.id)) {
+        delete payload.id;
+      }
 
-      if (error) throw new Error(error.message);
-      return data as Project;
-    } catch {
+      let res;
+      if (existing?.id) {
+        res = await (supabase as any)
+          .from('projects')
+          .update({ ...payload, updated_at: new Date().toISOString() })
+          .eq('id', existing.id)
+          .select()
+          .single();
+      } else {
+        res = await (supabase as any)
+          .from('projects')
+          .insert({ ...payload, updated_at: new Date().toISOString() })
+          .select()
+          .single();
+      }
+
+      if (res.error) {
+        console.error('[AdminService.upsertProject] DB error:', res.error.message);
+        throw new Error(res.error.message);
+      }
+      const resultData = res.data as Project;
+      DevFallbackStore.upsertProject(resultData);
+      return resultData;
+    } catch (err) {
+      console.error('[AdminService.upsertProject] Error:', err);
       return DevFallbackStore.upsertProject(project);
     }
   },
@@ -235,10 +366,18 @@ export const AdminService = {
       return;
     }
     try {
-      const supabase = await createClient();
-      const { error } = await supabase.from('projects').delete().or(`id.eq.${id},slug.eq.${id}`);
-      if (error) throw new Error(error.message);
-    } catch {
+      const supabase = await getDbClient();
+      let query = supabase.from('projects').delete();
+      if (isValidUuid(id)) {
+        query = query.or(`id.eq.${id},slug.eq.${id}`);
+      } else {
+        query = query.eq('slug', id);
+      }
+      const { error } = await query;
+      if (error) console.error('[AdminService.deleteProject] DB error:', error.message);
+      DevFallbackStore.deleteProject(id);
+    } catch (err) {
+      console.error('[AdminService.deleteProject] Exception:', err);
       DevFallbackStore.deleteProject(id);
     }
   },
@@ -249,12 +388,18 @@ export const AdminService = {
       return;
     }
     try {
-      const supabase = await createClient();
-      const updates = orderedIds.map((id, index) =>
-        (supabase as any).from('projects').update({ display_order: index + 1 }).or(`id.eq.${id},slug.eq.${id}`)
-      );
+      const supabase = await getDbClient();
+      const updates = orderedIds.map((id, index) => {
+        let q = (supabase as any).from('projects').update({ display_order: index + 1 });
+        if (isValidUuid(id)) {
+          return q.eq('id', id);
+        } else {
+          return q.eq('slug', id);
+        }
+      });
       await Promise.all(updates);
-    } catch {
+    } catch (err) {
+      console.error('[AdminService.reorderProjects] Exception:', err);
       DevFallbackStore.reorderProjects(orderedIds);
     }
   },
@@ -267,15 +412,22 @@ export const AdminService = {
       return DevFallbackStore.getAllExperience();
     }
     try {
-      const supabase = await createClient();
+      const supabase = await getDbClient();
       const { data, error } = await supabase
         .from('experience')
         .select('*')
         .order('display_order', { ascending: true });
 
-      if (error) throw new Error(error.message);
-      return (data as Experience[]) || [];
-    } catch {
+      if (error) {
+        console.error('[AdminService.getAllExperience] DB error:', error.message);
+        return DevFallbackStore.getAllExperience();
+      }
+      if (Array.isArray(data) && data.length > 0) {
+        return data as Experience[];
+      }
+      return DevFallbackStore.getAllExperience();
+    } catch (err) {
+      console.error('[AdminService.getAllExperience] Exception:', err);
       return DevFallbackStore.getAllExperience();
     }
   },
@@ -285,29 +437,52 @@ export const AdminService = {
       return DevFallbackStore.upsertExperience(exp);
     }
     try {
-      const supabase = await createClient();
-      const payload = { ...exp };
-      if (!payload.id) {
+      const supabase = await getDbClient();
+      const payload: any = { ...exp, updated_at: new Date().toISOString() };
+
+      let existing: any = null;
+      if (isValidUuid(payload.id)) {
+        const { data } = await supabase.from('experience').select('id').eq('id', payload.id).maybeSingle();
+        existing = data;
+      } else if (payload.company && payload.position) {
+        const { data } = await supabase
+          .from('experience')
+          .select('id')
+          .eq('company', payload.company)
+          .eq('position', payload.position)
+          .maybeSingle();
+        existing = data;
+      }
+
+      if (!isValidUuid(payload.id)) {
         delete payload.id;
-        const { data, error } = await (supabase as any)
+      }
+
+      let res;
+      if (existing?.id) {
+        res = await (supabase as any)
+          .from('experience')
+          .update(payload)
+          .eq('id', existing.id)
+          .select()
+          .single();
+      } else {
+        res = await (supabase as any)
           .from('experience')
           .insert(payload)
           .select()
           .single();
-
-        if (error) throw new Error(error.message);
-        return data as Experience;
       }
 
-      const { data, error } = await supabase
-        .from('experience')
-        .upsert(payload as any)
-        .select()
-        .single();
-
-      if (error) throw new Error(error.message);
-      return data as Experience;
-    } catch {
+      if (res.error) {
+        console.error('[AdminService.upsertExperience] DB error:', res.error.message);
+        throw new Error(res.error.message);
+      }
+      const resultData = res.data as Experience;
+      DevFallbackStore.upsertExperience(resultData);
+      return resultData;
+    } catch (err) {
+      console.error('[AdminService.upsertExperience] Error:', err);
       return DevFallbackStore.upsertExperience(exp);
     }
   },
@@ -317,16 +492,23 @@ export const AdminService = {
       return DevFallbackStore.getExperienceById(id);
     }
     try {
-      const supabase = await createClient();
+      if (!isValidUuid(id)) {
+        return DevFallbackStore.getExperienceById(id);
+      }
+      const supabase = await getDbClient();
       const { data, error } = await supabase
         .from('experience')
         .select('*')
         .eq('id', id)
         .maybeSingle();
 
-      if (error) throw new Error(error.message);
-      return data as Experience | null;
-    } catch {
+      if (error) {
+        console.error('[AdminService.getExperienceById] DB error:', error.message);
+        return DevFallbackStore.getExperienceById(id);
+      }
+      return (data as Experience | null) || DevFallbackStore.getExperienceById(id);
+    } catch (err) {
+      console.error('[AdminService.getExperienceById] Exception:', err);
       return DevFallbackStore.getExperienceById(id);
     }
   },
@@ -337,12 +519,13 @@ export const AdminService = {
       return;
     }
     try {
-      const supabase = await createClient();
-      const updates = orderedIds.map((id, index) =>
+      const supabase = await getDbClient();
+      const updates = orderedIds.filter(isValidUuid).map((id, index) =>
         (supabase as any).from('experience').update({ display_order: index + 1 }).eq('id', id)
       );
       await Promise.all(updates);
-    } catch {
+    } catch (err) {
+      console.error('[AdminService.reorderExperience] Exception:', err);
       DevFallbackStore.reorderExperience(orderedIds);
     }
   },
@@ -353,10 +536,14 @@ export const AdminService = {
       return;
     }
     try {
-      const supabase = await createClient();
-      const { error } = await supabase.from('experience').delete().eq('id', id);
-      if (error) throw new Error(error.message);
-    } catch {
+      if (isValidUuid(id)) {
+        const supabase = await getDbClient();
+        const { error } = await supabase.from('experience').delete().eq('id', id);
+        if (error) console.error('[AdminService.deleteExperience] DB error:', error.message);
+      }
+      DevFallbackStore.deleteExperience(id);
+    } catch (err) {
+      console.error('[AdminService.deleteExperience] Exception:', err);
       DevFallbackStore.deleteExperience(id);
     }
   },
@@ -369,15 +556,22 @@ export const AdminService = {
       return DevFallbackStore.getAllSkills();
     }
     try {
-      const supabase = await createClient();
+      const supabase = await getDbClient();
       const { data, error } = await supabase
         .from('skills')
         .select('*')
         .order('display_order', { ascending: true });
 
-      if (error) throw new Error(error.message);
-      return (data as Skill[]) || [];
-    } catch {
+      if (error) {
+        console.error('[AdminService.getAllSkills] DB error:', error.message);
+        return DevFallbackStore.getAllSkills();
+      }
+      if (Array.isArray(data) && data.length > 0) {
+        return data as Skill[];
+      }
+      return DevFallbackStore.getAllSkills();
+    } catch (err) {
+      console.error('[AdminService.getAllSkills] Exception:', err);
       return DevFallbackStore.getAllSkills();
     }
   },
@@ -387,16 +581,23 @@ export const AdminService = {
       return DevFallbackStore.getSkillById(id);
     }
     try {
-      const supabase = await createClient();
+      if (!isValidUuid(id)) {
+        return DevFallbackStore.getSkillById(id);
+      }
+      const supabase = await getDbClient();
       const { data, error } = await supabase
         .from('skills')
         .select('*')
         .eq('id', id)
         .maybeSingle();
 
-      if (error) throw new Error(error.message);
-      return data as Skill | null;
-    } catch {
+      if (error) {
+        console.error('[AdminService.getSkillById] DB error:', error.message);
+        return DevFallbackStore.getSkillById(id);
+      }
+      return (data as Skill | null) || DevFallbackStore.getSkillById(id);
+    } catch (err) {
+      console.error('[AdminService.getSkillById] Exception:', err);
       return DevFallbackStore.getSkillById(id);
     }
   },
@@ -406,29 +607,47 @@ export const AdminService = {
       return DevFallbackStore.upsertSkill(skill);
     }
     try {
-      const supabase = await createClient();
-      const payload = { ...skill };
-      if (!payload.id) {
+      const supabase = await getDbClient();
+      const payload: any = { ...skill, updated_at: new Date().toISOString() };
+
+      let existing: any = null;
+      if (isValidUuid(payload.id)) {
+        const { data } = await supabase.from('skills').select('id').eq('id', payload.id).maybeSingle();
+        existing = data;
+      } else if (payload.name) {
+        const { data } = await supabase.from('skills').select('id').eq('name', payload.name).maybeSingle();
+        existing = data;
+      }
+
+      if (!isValidUuid(payload.id)) {
         delete payload.id;
-        const { data, error } = await (supabase as any)
+      }
+
+      let res;
+      if (existing?.id) {
+        res = await (supabase as any)
+          .from('skills')
+          .update(payload)
+          .eq('id', existing.id)
+          .select()
+          .single();
+      } else {
+        res = await (supabase as any)
           .from('skills')
           .insert(payload)
           .select()
           .single();
-
-        if (error) throw new Error(error.message);
-        return data as Skill;
       }
 
-      const { data, error } = await supabase
-        .from('skills')
-        .upsert(payload as any)
-        .select()
-        .single();
-
-      if (error) throw new Error(error.message);
-      return data as Skill;
-    } catch {
+      if (res.error) {
+        console.error('[AdminService.upsertSkill] DB error:', res.error.message);
+        throw new Error(res.error.message);
+      }
+      const resultData = res.data as Skill;
+      DevFallbackStore.upsertSkill(resultData);
+      return resultData;
+    } catch (err) {
+      console.error('[AdminService.upsertSkill] Error:', err);
       return DevFallbackStore.upsertSkill(skill);
     }
   },
@@ -439,10 +658,14 @@ export const AdminService = {
       return;
     }
     try {
-      const supabase = await createClient();
-      const { error } = await supabase.from('skills').delete().eq('id', id);
-      if (error) throw new Error(error.message);
-    } catch {
+      if (isValidUuid(id)) {
+        const supabase = await getDbClient();
+        const { error } = await supabase.from('skills').delete().eq('id', id);
+        if (error) console.error('[AdminService.deleteSkill] DB error:', error.message);
+      }
+      DevFallbackStore.deleteSkill(id);
+    } catch (err) {
+      console.error('[AdminService.deleteSkill] Exception:', err);
       DevFallbackStore.deleteSkill(id);
     }
   },
@@ -453,12 +676,13 @@ export const AdminService = {
       return;
     }
     try {
-      const supabase = await createClient();
-      const updates = orderedIds.map((id, index) =>
+      const supabase = await getDbClient();
+      const updates = orderedIds.filter(isValidUuid).map((id, index) =>
         (supabase as any).from('skills').update({ display_order: index + 1 }).eq('id', id)
       );
       await Promise.all(updates);
-    } catch {
+    } catch (err) {
+      console.error('[AdminService.reorderSkills] Exception:', err);
       DevFallbackStore.reorderSkills(orderedIds);
     }
   },
@@ -509,7 +733,7 @@ export const AdminService = {
           categories[index] = targetCategory;
 
           if (cat.name && cat.name !== oldName) {
-            const supabase = await createClient();
+            const supabase = await getDbClient();
             await (supabase as any)
               .from('skills')
               .update({ category: cat.name })
@@ -641,15 +865,22 @@ export const AdminService = {
       return DevFallbackStore.getAllCertifications();
     }
     try {
-      const supabase = await createClient();
+      const supabase = await getDbClient();
       const { data, error } = await supabase
         .from('certifications')
         .select('*')
         .order('display_order', { ascending: true });
 
-      if (error) throw new Error(error.message);
-      return (data as Certification[]) || [];
-    } catch {
+      if (error) {
+        console.error('[AdminService.getAllCertifications] DB error:', error.message);
+        return DevFallbackStore.getAllCertifications();
+      }
+      if (Array.isArray(data) && data.length > 0) {
+        return data as Certification[];
+      }
+      return DevFallbackStore.getAllCertifications();
+    } catch (err) {
+      console.error('[AdminService.getAllCertifications] Exception:', err);
       return DevFallbackStore.getAllCertifications();
     }
   },
@@ -659,16 +890,23 @@ export const AdminService = {
       return DevFallbackStore.getCertificationById(id);
     }
     try {
-      const supabase = await createClient();
+      if (!isValidUuid(id)) {
+        return DevFallbackStore.getCertificationById(id);
+      }
+      const supabase = await getDbClient();
       const { data, error } = await supabase
         .from('certifications')
         .select('*')
         .eq('id', id)
         .maybeSingle();
 
-      if (error) throw new Error(error.message);
-      return (data as unknown as Certification) || null;
-    } catch {
+      if (error) {
+        console.error('[AdminService.getCertificationById] DB error:', error.message);
+        return DevFallbackStore.getCertificationById(id);
+      }
+      return (data as unknown as Certification) || DevFallbackStore.getCertificationById(id);
+    } catch (err) {
+      console.error('[AdminService.getCertificationById] Exception:', err);
       return DevFallbackStore.getCertificationById(id);
     }
   },
@@ -678,30 +916,47 @@ export const AdminService = {
       return DevFallbackStore.upsertCertification(cert);
     }
     try {
-      const supabase = await createClient();
-      const payload: any = { ...cert };
+      const supabase = await getDbClient();
+      const payload: any = { ...cert, updated_at: new Date().toISOString() };
 
-      if (!payload.id) {
+      let existing: any = null;
+      if (isValidUuid(payload.id)) {
+        const { data } = await supabase.from('certifications').select('id').eq('id', payload.id).maybeSingle();
+        existing = data;
+      } else if (payload.title) {
+        const { data } = await supabase.from('certifications').select('id').eq('title', payload.title).maybeSingle();
+        existing = data;
+      }
+
+      if (!isValidUuid(payload.id)) {
         delete payload.id;
-        const { data, error } = await (supabase as any)
+      }
+
+      let res;
+      if (existing?.id) {
+        res = await (supabase as any)
+          .from('certifications')
+          .update(payload)
+          .eq('id', existing.id)
+          .select()
+          .single();
+      } else {
+        res = await (supabase as any)
           .from('certifications')
           .insert(payload)
           .select()
           .single();
-
-        if (error) throw new Error(error.message);
-        return data as Certification;
       }
 
-      const { data, error } = await supabase
-        .from('certifications')
-        .upsert(payload)
-        .select()
-        .single();
-
-      if (error) throw new Error(error.message);
-      return data as Certification;
-    } catch {
+      if (res.error) {
+        console.error('[AdminService.upsertCertification] DB error:', res.error.message);
+        throw new Error(res.error.message);
+      }
+      const resultData = res.data as Certification;
+      DevFallbackStore.upsertCertification(resultData);
+      return resultData;
+    } catch (err) {
+      console.error('[AdminService.upsertCertification] Error:', err);
       return DevFallbackStore.upsertCertification(cert);
     }
   },
@@ -712,10 +967,14 @@ export const AdminService = {
       return;
     }
     try {
-      const supabase = await createClient();
-      const { error } = await supabase.from('certifications').delete().eq('id', id);
-      if (error) throw new Error(error.message);
-    } catch {
+      if (isValidUuid(id)) {
+        const supabase = await getDbClient();
+        const { error } = await supabase.from('certifications').delete().eq('id', id);
+        if (error) console.error('[AdminService.deleteCertification] DB error:', error.message);
+      }
+      DevFallbackStore.deleteCertification(id);
+    } catch (err) {
+      console.error('[AdminService.deleteCertification] Exception:', err);
       DevFallbackStore.deleteCertification(id);
     }
   },
@@ -726,15 +985,16 @@ export const AdminService = {
       return;
     }
     try {
-      const supabase = await createClient();
-      const updates = orderedIds.map((id, index) =>
+      const supabase = await getDbClient();
+      const updates = orderedIds.filter(isValidUuid).map((id, index) =>
         (supabase as any)
           .from('certifications')
           .update({ display_order: index + 1 })
           .eq('id', id)
       );
       await Promise.all(updates);
-    } catch {
+    } catch (err) {
+      console.error('[AdminService.reorderCertifications] Exception:', err);
       DevFallbackStore.reorderCertifications(orderedIds);
     }
   },
@@ -747,16 +1007,23 @@ export const AdminService = {
       return DevFallbackStore.getSiteSettings();
     }
     try {
-      const supabase = await createClient();
+      const supabase = await getDbClient();
       const { data, error } = await supabase
         .from('site_settings')
         .select('*')
         .limit(1)
         .maybeSingle();
 
-      if (error) throw new Error(error.message);
-      return (data as unknown as SiteSettings) || DevFallbackStore.getSiteSettings();
-    } catch {
+      if (error) {
+        console.error('[AdminService.getSiteSettings] Error:', error.message);
+        return DevFallbackStore.getSiteSettings();
+      }
+      if (data) {
+        return data as unknown as SiteSettings;
+      }
+      return DevFallbackStore.getSiteSettings();
+    } catch (err) {
+      console.error('[AdminService.getSiteSettings] Exception:', err);
       return DevFallbackStore.getSiteSettings();
     }
   },
@@ -766,16 +1033,61 @@ export const AdminService = {
       return DevFallbackStore.updateSiteSettings(settings);
     }
     try {
-      const supabase = await createClient();
-      const { data, error } = await supabase
-        .from('site_settings')
-        .upsert({ ...settings, id: settings.id || undefined } as any)
-        .select()
-        .single();
+      const supabase = await getDbClient();
 
-      if (error) throw new Error(error.message);
-      return data as SiteSettings;
-    } catch {
+      // Find the existing singleton row
+      const { data: existingRow, error: findError } = await supabase
+        .from('site_settings')
+        .select('*')
+        .limit(1)
+        .maybeSingle();
+      const existing = existingRow as any;
+
+      if (findError) {
+        console.warn('[AdminService.updateSiteSettings] Lookup warning:', findError.message);
+      }
+
+      const payload: any = {
+        ...settings,
+        updated_at: new Date().toISOString(),
+      };
+      // Never attempt to change primary key or pass null/undefined id into upsert/insert
+      delete payload.id;
+
+      let resultData: SiteSettings;
+
+      if (existing?.id) {
+        const { data, error } = await (supabase as any)
+          .from('site_settings')
+          .update(payload)
+          .eq('id', existing.id)
+          .select()
+          .single();
+
+        if (error) {
+          console.error('[AdminService.updateSiteSettings] Update error:', error.message);
+          throw new Error(error.message);
+        }
+        resultData = data as SiteSettings;
+      } else {
+        const { data, error } = await (supabase as any)
+          .from('site_settings')
+          .insert(payload)
+          .select()
+          .single();
+
+        if (error) {
+          console.error('[AdminService.updateSiteSettings] Insert error:', error.message);
+          throw new Error(error.message);
+        }
+        resultData = data as SiteSettings;
+      }
+
+      // Also update in-memory fallback store
+      DevFallbackStore.updateSiteSettings(resultData);
+      return resultData;
+    } catch (err) {
+      console.error('[AdminService.updateSiteSettings] Fatal error:', err);
       return DevFallbackStore.updateSiteSettings(settings);
     }
   },
@@ -956,15 +1268,19 @@ export const AdminService = {
       return DevFallbackStore.getAllDrafts();
     }
     try {
-      const supabase = await createClient();
+      const supabase = await getDbClient();
       const { data, error } = await supabase
         .from('cms_drafts')
         .select('*')
         .order('updated_at', { ascending: false });
 
-      if (error) throw new Error(error.message);
+      if (error) {
+        console.error('[AdminService.getAllDrafts] DB error:', error.message);
+        return DevFallbackStore.getAllDrafts();
+      }
       return (data as CmsDraft[]) || DevFallbackStore.getAllDrafts();
-    } catch {
+    } catch (err) {
+      console.error('[AdminService.getAllDrafts] Exception:', err);
       return DevFallbackStore.getAllDrafts();
     }
   },
@@ -974,16 +1290,20 @@ export const AdminService = {
       return DevFallbackStore.getDraftById(id);
     }
     try {
-      const supabase = await createClient();
+      const supabase = await getDbClient();
       const { data, error } = await supabase
         .from('cms_drafts')
         .select('*')
         .eq('id', id)
         .maybeSingle();
 
-      if (error) throw new Error(error.message);
+      if (error) {
+        console.error('[AdminService.getDraftById] DB error:', error.message);
+        return DevFallbackStore.getDraftById(id);
+      }
       return (data as unknown as CmsDraft) || DevFallbackStore.getDraftById(id);
-    } catch {
+    } catch (err) {
+      console.error('[AdminService.getDraftById] Exception:', err);
       return DevFallbackStore.getDraftById(id);
     }
   },
@@ -993,7 +1313,7 @@ export const AdminService = {
       return DevFallbackStore.getDraftByEntity(entityType, entityId);
     }
     try {
-      const supabase = await createClient();
+      const supabase = await getDbClient();
       const { data, error } = await supabase
         .from('cms_drafts')
         .select('*')
@@ -1001,9 +1321,13 @@ export const AdminService = {
         .eq('entity_id', entityId)
         .maybeSingle();
 
-      if (error) throw new Error(error.message);
+      if (error) {
+        console.error('[AdminService.getDraftByEntity] DB error:', error.message);
+        return DevFallbackStore.getDraftByEntity(entityType, entityId);
+      }
       return (data as unknown as CmsDraft) || DevFallbackStore.getDraftByEntity(entityType, entityId);
-    } catch {
+    } catch (err) {
+      console.error('[AdminService.getDraftByEntity] Exception:', err);
       return DevFallbackStore.getDraftByEntity(entityType, entityId);
     }
   },
@@ -1015,7 +1339,7 @@ export const AdminService = {
       return DevFallbackStore.saveDraft(draft);
     }
     try {
-      const supabase = await createClient();
+      const supabase = await getDbClient();
       const id = draft.id || `draft-${draft.entity_type}-${draft.entity_id}`;
       const now = new Date().toISOString();
 
@@ -1036,9 +1360,15 @@ export const AdminService = {
         .select()
         .single();
 
-      if (error) throw new Error(error.message);
-      return data as CmsDraft;
-    } catch {
+      if (error) {
+        console.error('[AdminService.saveDraft] DB error:', error.message);
+        throw new Error(error.message);
+      }
+      const saved = data as CmsDraft;
+      DevFallbackStore.saveDraft(saved);
+      return saved;
+    } catch (err) {
+      console.error('[AdminService.saveDraft] Error:', err);
       return DevFallbackStore.saveDraft(draft);
     }
   },
@@ -1048,11 +1378,13 @@ export const AdminService = {
       return DevFallbackStore.discardDraft(id);
     }
     try {
-      const supabase = await createClient();
+      const supabase = await getDbClient();
       const { error } = await supabase.from('cms_drafts').delete().eq('id', id);
-      if (error) throw new Error(error.message);
+      if (error) console.error('[AdminService.discardDraft] DB error:', error.message);
+      DevFallbackStore.discardDraft(id);
       return true;
-    } catch {
+    } catch (err) {
+      console.error('[AdminService.discardDraft] Exception:', err);
       return DevFallbackStore.discardDraft(id);
     }
   },
@@ -1062,11 +1394,13 @@ export const AdminService = {
       return DevFallbackStore.discardAllDrafts();
     }
     try {
-      const supabase = await createClient();
+      const supabase = await getDbClient();
       const { error } = await supabase.from('cms_drafts').delete().neq('id', 'non-existent');
-      if (error) throw new Error(error.message);
+      if (error) console.error('[AdminService.discardAllDrafts] DB error:', error.message);
+      DevFallbackStore.discardAllDrafts();
       return true;
-    } catch {
+    } catch (err) {
+      console.error('[AdminService.discardAllDrafts] Exception:', err);
       return DevFallbackStore.discardAllDrafts();
     }
   },
@@ -1196,7 +1530,7 @@ export const AdminService = {
       items = DevFallbackStore.getAllMediaWithUsage();
     } else {
       try {
-        const supabase = await createClient();
+        const supabase = await getDbClient();
         const { data, error } = await supabase
           .from('media')
           .select('*')
@@ -1280,7 +1614,7 @@ export const AdminService = {
     // 2. Also register in PostgreSQL if configured
     if (DevFallbackStore.isConfigured()) {
       try {
-        const supabase = await createClient();
+        const supabase = await getDbClient();
         await (supabase as any).from('media').upsert({
           id: item.id,
           file_name: item.file_name,
@@ -1311,7 +1645,7 @@ export const AdminService = {
 
     if (DevFallbackStore.isConfigured() && updated) {
       try {
-        const supabase = await createClient();
+        const supabase = await getDbClient();
         await (supabase as any)
           .from('media')
           .update({
@@ -1352,7 +1686,7 @@ export const AdminService = {
     // 3. Delete from Supabase Storage bucket if configured
     if (DevFallbackStore.isConfigured() && item.storage_path) {
       try {
-        const supabase = await createClient();
+        const supabase = await getDbClient();
         const bucket = item.media_type === 'document' ? 'portfolio-documents' : 'portfolio-images';
         await supabase.storage.from(bucket).remove([item.storage_path]);
         await supabase.from('media').delete().eq('id', item.id);
@@ -1450,7 +1784,7 @@ export const AdminService = {
     // 3. Supabase upload if configured
     if (process.env.NEXT_PUBLIC_SUPABASE_URL) {
       try {
-        const supabase = await createClient();
+        const supabase = await getDbClient();
         const { error: uploadError } = await supabase.storage
           .from(bucket)
           .upload(storagePath, buffer, {

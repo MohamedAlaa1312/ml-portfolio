@@ -8,6 +8,7 @@ import { CertificationsManager } from '@/components/admin/certifications/Certifi
 import type { Certification } from '@/lib/supabase/types';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export default async function AdminCertificationsPage() {
   // 1. Server-Side Defense-in-Depth Authorization Check

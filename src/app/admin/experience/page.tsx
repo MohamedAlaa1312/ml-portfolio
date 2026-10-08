@@ -8,6 +8,7 @@ import { ExperienceManager } from '@/components/admin/experience/ExperienceManag
 import type { Experience } from '@/lib/supabase/types';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export default async function AdminExperiencePage() {
   // 1. Server-Side Defense-in-Depth Authorization Check

@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { DevFallbackStore } from '@/lib/store';
 import type {
   SiteSettings,
@@ -10,6 +11,18 @@ import type {
   SocialLinkItem,
 } from '@/lib/supabase/types';
 import { parseSocialLinks } from '@/lib/social-utils';
+
+async function getDbClient() {
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
+  if (serviceKey) {
+    try {
+      return createAdminClient();
+    } catch {
+      // fallback to cookie/anon client
+    }
+  }
+  return await createClient();
+}
 
 /**
  * Public CMS Data Access Service.
@@ -31,7 +44,7 @@ export const CmsService = {
       settings = DevFallbackStore.getSiteSettings();
     } else {
       try {
-        const supabase = await createClient();
+        const supabase = await getDbClient();
         const { data, error } = await supabase
           .from('site_settings')
           .select('*')
@@ -69,7 +82,7 @@ export const CmsService = {
       return DevFallbackStore.getPublishedSections();
     }
     try {
-      const supabase = await createClient();
+      const supabase = await getDbClient();
       const { data, error } = await supabase
         .from('sections')
         .select('*')
@@ -94,7 +107,7 @@ export const CmsService = {
       return DevFallbackStore.getPublishedProjects(featuredOnly);
     }
     try {
-      const supabase = await createClient();
+      const supabase = await getDbClient();
       let query = supabase
         .from('projects')
         .select('*')
@@ -124,7 +137,7 @@ export const CmsService = {
       return DevFallbackStore.getEnabledSkills();
     }
     try {
-      const supabase = await createClient();
+      const supabase = await getDbClient();
       const { data, error } = await supabase
         .from('skills')
         .select('*')
@@ -148,7 +161,7 @@ export const CmsService = {
       return DevFallbackStore.getPublishedExperience();
     }
     try {
-      const supabase = await createClient();
+      const supabase = await getDbClient();
       const { data, error } = await supabase
         .from('experience')
         .select('*')
@@ -173,7 +186,7 @@ export const CmsService = {
       return DevFallbackStore.getPublishedCertifications();
     }
     try {
-      const supabase = await createClient();
+      const supabase = await getDbClient();
       const { data, error } = await supabase
         .from('certifications')
         .select('*')

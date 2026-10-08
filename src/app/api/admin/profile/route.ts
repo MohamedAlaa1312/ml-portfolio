@@ -24,7 +24,7 @@ export async function GET() {
 
   try {
     const [siteSettings, sections] = await Promise.all([
-      CmsService.getSiteSettings(),
+      AdminService.getSiteSettings(),
       AdminService.getAllSections().catch(() => [] as Section[]),
     ]);
 
@@ -199,7 +199,7 @@ export async function POST(request: Request) {
 
     // 5. Revalidate public cache for instant updates
     try {
-      revalidatePath('/');
+      revalidatePath('/', 'layout');
       revalidatePath('/admin/profile');
       revalidatePath('/admin/dashboard');
     } catch {

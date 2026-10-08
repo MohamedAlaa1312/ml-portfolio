@@ -171,7 +171,7 @@ export async function POST(request: Request) {
 
     // 8. Revalidate public and admin paths
     try {
-      revalidatePath('/');
+      revalidatePath('/', 'layout');
       revalidatePath('/admin/settings');
       revalidatePath('/admin/dashboard');
     } catch {

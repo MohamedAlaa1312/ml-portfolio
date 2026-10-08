@@ -7,6 +7,7 @@ import { AdminLayout } from '@/components/admin';
 import { SettingsManager } from '@/components/admin/settings';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export default async function AdminSettingsPage() {
   // 1. Defense-in-Depth Server-Side Authorization Check

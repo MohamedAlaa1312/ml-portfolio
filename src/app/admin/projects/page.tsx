@@ -8,6 +8,7 @@ import { ProjectsManager } from '@/components/admin/projects/ProjectsManager';
 import type { Project, Skill } from '@/lib/supabase/types';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export default async function AdminProjectsPage() {
   // 1. Server-Side Defense-in-Depth Authorization Check

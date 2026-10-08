@@ -26,7 +26,7 @@ export async function GET() {
 
   try {
     const [siteSettings, contactSection, socialLinks] = await Promise.all([
-      CmsService.getSiteSettings(),
+      AdminService.getSiteSettings(),
       AdminService.getContactSection(),
       AdminService.getSocialLinks(),
     ]);
@@ -151,7 +151,7 @@ export async function POST(request: Request) {
 
     // 6. Cache Revalidation
     try {
-      revalidatePath('/');
+      revalidatePath('/', 'layout');
       revalidatePath('/admin/contact');
       revalidatePath('/admin/profile');
     } catch {

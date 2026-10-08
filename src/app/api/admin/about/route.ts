@@ -24,7 +24,7 @@ export async function GET() {
   try {
     const [sections, siteSettings] = await Promise.all([
       AdminService.getAllSections().catch(() => [] as Section[]),
-      CmsService.getSiteSettings().catch(() => null),
+      AdminService.getSiteSettings().catch(() => null),
     ]);
 
     const aboutSection =
@@ -107,7 +107,7 @@ export async function POST(request: Request) {
 
     // Revalidate public and admin paths
     try {
-      revalidatePath('/');
+      revalidatePath('/', 'layout');
       revalidatePath('/admin/about');
       revalidatePath('/admin/dashboard');
     } catch {

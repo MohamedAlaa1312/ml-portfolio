@@ -9,6 +9,7 @@ import { ProfileHeroEditor } from '@/components/admin/ProfileHeroEditor';
 import type { Section } from '@/lib/supabase/types';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export default async function AdminProfilePage() {
   // 1. Server-Side Defense-in-Depth Authorization Check
@@ -33,7 +34,7 @@ export default async function AdminProfilePage() {
 
   // 3. Load Current Profile & Hero Settings
   const [siteSettings, sections] = await Promise.all([
-    CmsService.getSiteSettings().catch(() => null),
+    AdminService.getSiteSettings().catch(() => null),
     AdminService.getAllSections().catch(() => [] as Section[]),
   ]);
 
