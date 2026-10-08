@@ -71,7 +71,7 @@ export default function DesignSystemShowcasePage() {
             subtitle="Prominently accommodates large profile portrait, bold name, clear ML Engineer title, and key CTAs without cinematic distractions."
           />
           <IdentityFrame
-            name="Mohamed Khaled"
+            name="Mohamed Alaa"
             title="Machine Learning Engineer"
             introduction="I design and build production-grade machine learning models, neural pipelines, and scalable data-driven systems. Passionate about applied AI and solving complex technical challenges."
             actions={

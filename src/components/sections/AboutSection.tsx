@@ -76,7 +76,7 @@ export const AboutSection: React.FC<AboutSectionProps> = ({ content, settings })
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={avatarUrl}
-                alt={settings?.name ? `${settings.name} — Machine Learning Engineer` : 'About Mohamed Khaled'}
+                alt={settings?.name ? `${settings.name} — Machine Learning Engineer` : 'About Mohamed Alaa'}
                 className="w-full h-full object-cover object-center filter contrast-105"
                 loading="lazy"
               />

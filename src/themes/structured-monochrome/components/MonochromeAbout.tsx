@@ -79,7 +79,7 @@ export const MonochromeAbout: React.FC<ThemeAboutProps> = ({ content, settings, 
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={avatarUrl}
-                  alt={settings?.name ? `${settings.name} — Machine Learning Engineer` : 'About Mohamed Khaled'}
+                  alt={settings?.name ? `${settings.name} — Machine Learning Engineer` : 'About Mohamed Alaa'}
                   className="w-full h-full object-cover object-center filter grayscale contrast-125"
                   loading="lazy"
                 />

@@ -223,7 +223,7 @@ export const MediaDetailsModal: React.FC<MediaDetailsModalProps> = ({
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g. Mohamed Khaled Profile Photo"
+                placeholder="e.g. Mohamed Alaa Profile Photo"
               />
 
               {isImage && (
@@ -233,7 +233,7 @@ export const MediaDetailsModal: React.FC<MediaDetailsModalProps> = ({
                   type="text"
                   value={altText}
                   onChange={(e) => setAltText(e.target.value)}
-                  placeholder="e.g. Portrait photo of Mohamed Khaled wearing professional attire"
+                  placeholder="e.g. Portrait photo of Mohamed Alaa wearing professional attire"
                 />
               )}
 

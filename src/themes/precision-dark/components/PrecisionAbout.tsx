@@ -81,7 +81,7 @@ export const PrecisionAbout: React.FC<ThemeAboutProps> = ({ content, settings, s
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={avatarUrl}
-                alt={settings?.name ? `${settings.name} — Machine Learning Engineer` : 'About Mohamed Khaled'}
+                alt={settings?.name ? `${settings.name} — Machine Learning Engineer` : 'About Mohamed Alaa'}
                 className="w-full h-full object-cover object-center filter contrast-[1.03]"
                 loading="lazy"
               />

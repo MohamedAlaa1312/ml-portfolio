@@ -14,7 +14,7 @@ interface HeroSectionProps {
 
 export const HeroSection: React.FC<HeroSectionProps> = ({ content, settings }) => {
   const greeting = content?.greeting || "Hello, I'm";
-  const name = settings?.name || 'Mohamed Khaled';
+  const name = settings?.name || 'Mohamed Alaa';
   const role = settings?.professional_title || 'Machine Learning Engineer';
   const summary =
     content?.summary ||

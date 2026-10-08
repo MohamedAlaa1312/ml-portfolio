@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import type { ThemeNavigationProps } from '../../types';
 
 export const MonochromeNavbar: React.FC<ThemeNavigationProps> = ({
-  name = 'Mohamed Khaled',
+  name = 'Mohamed Alaa',
   role = 'Machine Learning Engineer',
   resumeUrl = '/documents/resume.pdf',
   logoUrl,

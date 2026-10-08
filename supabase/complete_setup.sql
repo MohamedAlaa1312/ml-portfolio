@@ -72,7 +72,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- 4. SITE SETTINGS TABLE (Singleton)
 CREATE TABLE IF NOT EXISTS public.site_settings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name TEXT NOT NULL DEFAULT 'Mohamed Khaled',
+    name TEXT NOT NULL DEFAULT 'Mohamed Alaa',
     title TEXT NOT NULL DEFAULT 'Machine Learning Engineer',
     professional_title TEXT NOT NULL DEFAULT 'Machine Learning Engineer',
     subtitle TEXT NOT NULL DEFAULT 'Turning Data Into Intelligent Solutions',
@@ -83,7 +83,7 @@ CREATE TABLE IF NOT EXISTS public.site_settings (
     social_links JSONB NOT NULL DEFAULT '{"linkedin": "https://linkedin.com", "github": "https://github.com", "x": "https://x.com", "email": "mailto:mohamed@example.com"}'::jsonb,
     profile_image TEXT,
     profile_image_url TEXT,
-    hero_title TEXT NOT NULL DEFAULT 'Mohamed Khaled',
+    hero_title TEXT NOT NULL DEFAULT 'Mohamed Alaa',
     hero_subtitle TEXT NOT NULL DEFAULT 'Machine Learning Engineer',
     hero_media TEXT,
     hero_media_url TEXT,
@@ -93,15 +93,15 @@ CREATE TABLE IF NOT EXISTS public.site_settings (
     favicon_url TEXT,
     resume TEXT,
     resume_url TEXT,
-    seo_title TEXT NOT NULL DEFAULT 'Mohamed Khaled | Machine Learning Engineer Portfolio',
-    seo_description TEXT NOT NULL DEFAULT 'Portfolio of Mohamed Khaled, Machine Learning Engineer specializing in AI, Deep Learning, and data-driven systems.',
-    site_name TEXT DEFAULT 'Mohamed Khaled Portfolio',
-    site_description TEXT DEFAULT 'Portfolio of Mohamed Khaled, Machine Learning Engineer specializing in AI, Deep Learning, and data-driven systems.',
+    seo_title TEXT NOT NULL DEFAULT 'Mohamed Alaa | Machine Learning Engineer Portfolio',
+    seo_description TEXT NOT NULL DEFAULT 'Machine Learning Engineer portfolio showcasing AI architectures, deep learning models, data science pipelines, and verified certifications.',
+    site_name TEXT DEFAULT 'Mohamed Alaa Portfolio',
+    site_description TEXT DEFAULT 'Machine Learning Engineer portfolio showcasing AI architectures, deep learning models, data science pipelines, and verified certifications.',
     default_language TEXT DEFAULT 'en',
     timezone TEXT DEFAULT 'UTC',
-    og_image TEXT,
-    og_image_url TEXT,
-    canonical_url TEXT DEFAULT 'https://mohamedkhaled.dev',
+    og_image TEXT DEFAULT '/images/og-preview.jpg',
+    og_image_url TEXT DEFAULT '/images/og-preview.jpg',
+    canonical_url TEXT DEFAULT 'https://ml-portfolio-theta.vercel.app',
     allow_indexing BOOLEAN DEFAULT true,
     theme_preference TEXT DEFAULT 'dark',
     accent_color TEXT DEFAULT 'amber',
@@ -492,9 +492,14 @@ INSERT INTO public.site_settings (
     hero_subtitle,
     resume_url,
     seo_title,
-    seo_description
+    seo_description,
+    og_image,
+    og_image_url,
+    canonical_url,
+    site_name,
+    site_description
 ) VALUES (
-    'Mohamed Khaled',
+    'Mohamed Alaa',
     'Machine Learning Engineer',
     'Machine Learning Engineer',
     'Turning Data Into Intelligent Solutions',
@@ -508,10 +513,15 @@ INSERT INTO public.site_settings (
         "x": "https://x.com",
         "email": "mailto:mohamed@example.com"
     }'::jsonb,
-    'Mohamed Khaled',
+    'Mohamed Alaa',
     'Machine Learning Engineer',
     '/documents/resume.pdf',
-    'Mohamed Khaled | Machine Learning Engineer Portfolio',
+    'Mohamed Alaa | Machine Learning Engineer Portfolio',
+    'Machine Learning Engineer portfolio showcasing AI architectures, deep learning models, data science pipelines, and verified certifications.',
+    '/images/og-preview.jpg',
+    '/images/og-preview.jpg',
+    'https://ml-portfolio-theta.vercel.app',
+    'Mohamed Alaa Portfolio',
     'Machine Learning Engineer portfolio showcasing AI architectures, deep learning models, data science pipelines, and verified certifications.'
 )
 ON CONFLICT ((true)) DO UPDATE SET
@@ -523,7 +533,14 @@ ON CONFLICT ((true)) DO UPDATE SET
     email = EXCLUDED.email,
     phone = EXCLUDED.phone,
     location = EXCLUDED.location,
-    social_links = EXCLUDED.social_links;
+    social_links = EXCLUDED.social_links,
+    seo_title = EXCLUDED.seo_title,
+    seo_description = EXCLUDED.seo_description,
+    og_image = EXCLUDED.og_image,
+    og_image_url = EXCLUDED.og_image_url,
+    canonical_url = EXCLUDED.canonical_url,
+    site_name = EXCLUDED.site_name,
+    site_description = EXCLUDED.site_description;
 
 -- 2. SEED DYNAMIC SECTIONS
 INSERT INTO public.sections (type, title, slug, content, display_order, enabled, status)

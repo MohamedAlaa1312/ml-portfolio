@@ -6,7 +6,7 @@ import { parseSocialLinks, getPlatformIcon } from '@/lib/social-utils';
 
 export const EditorialHero: React.FC<ThemeHeroProps> = ({ content, settings }) => {
   const greeting = content?.greeting || 'PORTFOLIO // VOLUME 01';
-  const name = settings?.name || 'Mohamed Khaled';
+  const name = settings?.name || 'Mohamed Alaa';
   const role = settings?.professional_title || 'Machine Learning Engineer';
   const summary =
     content?.summary ||

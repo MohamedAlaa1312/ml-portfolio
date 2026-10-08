@@ -22,7 +22,7 @@ export const ProfileHeroEditor: React.FC<ProfileHeroEditorProps> = ({
   const initialHeroContent = (initialHeroSection?.content as HeroContent) || null;
 
   // Form State — Profile
-  const [name, setName] = useState(initialSettings?.name || 'Mohamed Khaled');
+  const [name, setName] = useState(initialSettings?.name || 'Mohamed Alaa');
   const [professionalTitle, setProfessionalTitle] = useState(
     initialSettings?.professional_title || 'Machine Learning Engineer'
   );

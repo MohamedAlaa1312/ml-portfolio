@@ -69,7 +69,7 @@ export default async function AdminPreviewPage(props: AdminPreviewPageProps) {
 
       {/* 2. Public Navigation (Resolved dynamically using preview sections) */}
       <renderers.NavigationRenderer
-        name={siteSettings?.name || 'Mohamed Khaled'}
+        name={siteSettings?.name || 'Mohamed Alaa'}
         role={siteSettings?.professional_title || 'Machine Learning Engineer'}
         resumeUrl={siteSettings?.resume_url || '/documents/resume.pdf'}
         sections={visibleSections}
@@ -109,7 +109,7 @@ export default async function AdminPreviewPage(props: AdminPreviewPageProps) {
 
       {/* 4. Footer */}
       <renderers.FooterRenderer
-        name={siteSettings?.name || 'Mohamed Khaled'}
+        name={siteSettings?.name || 'Mohamed Alaa'}
         role={siteSettings?.professional_title || 'Machine Learning Engineer'}
         sections={visibleSections}
       />

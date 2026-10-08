@@ -8,25 +8,32 @@ export const revalidate = 0;
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await CmsService.getSiteSettings().catch(() => null);
-  const siteName = settings?.site_name || settings?.name || 'Mohamed Khaled';
-  const title = settings?.seo_title || `${siteName} | Machine Learning Engineer`;
+  const siteName = settings?.site_name || settings?.name || 'Mohamed Alaa';
+  const title = settings?.seo_title || `${siteName} | Machine Learning Engineer Portfolio`;
   const description =
     settings?.seo_description ||
     settings?.site_description ||
-    'Portfolio of Mohamed Khaled, Machine Learning Engineer specializing in AI, Deep Learning, and data-driven systems.';
-  const canonicalUrl = settings?.canonical_url || 'https://mohamedkhaled.dev';
+    'Machine Learning Engineer portfolio showcasing AI architectures, deep learning models, data science pipelines, and verified certifications.';
   const allowIndexing = settings?.allow_indexing !== false;
-  const ogImageUrl = settings?.og_image_url || settings?.og_image || settings?.profile_image || '/images/profile.jpg';
   const faviconUrl = settings?.favicon_url || settings?.favicon || '/favicon.ico';
 
-  const validBaseUrl = canonicalUrl.startsWith('http') ? canonicalUrl : 'https://mohamedkhaled.dev';
+  const productionOrigin =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null) ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
+    'https://ml-portfolio-theta.vercel.app';
+
+  const rawOg = settings?.og_image_url || settings?.og_image || '/images/og-preview.jpg';
+  const absoluteOgImageUrl = rawOg.startsWith('http')
+    ? rawOg
+    : `${productionOrigin}${rawOg.startsWith('/') ? '' : '/'}${rawOg}`;
 
   return {
     title,
     description,
-    metadataBase: new URL(validBaseUrl),
+    metadataBase: new URL(productionOrigin),
     alternates: {
-      canonical: canonicalUrl,
+      canonical: settings?.canonical_url?.startsWith('http') ? settings.canonical_url : productionOrigin,
     },
     icons: {
       icon: faviconUrl,
@@ -34,15 +41,26 @@ export async function generateMetadata(): Promise<Metadata> {
     openGraph: {
       title,
       description,
-      url: canonicalUrl,
-      siteName,
+      url: productionOrigin,
+      siteName: settings?.site_name || `${siteName} Portfolio`,
       images: [
         {
-          url: ogImageUrl,
-          alt: title,
+          url: absoluteOgImageUrl,
+          width: 1200,
+          height: 630,
+          alt: `${siteName} — Machine Learning Engineer Portfolio`,
+          type: 'image/jpeg',
         },
       ],
       type: 'website',
+      locale: 'en_US',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: [absoluteOgImageUrl],
+      creator: '@MohamedAlaa',
     },
     robots: {
       index: allowIndexing,
@@ -117,7 +135,7 @@ export default async function HomePage(props: HomePageProps) {
     >
       {/* 1. Header Navigation via Active Theme */}
       <renderers.NavigationRenderer
-        name={siteSettings?.name || 'Mohamed Khaled'}
+        name={siteSettings?.name || 'Mohamed Alaa'}
         role={siteSettings?.professional_title || 'Machine Learning Engineer'}
         resumeUrl={siteSettings?.resume_url || '/documents/resume.pdf'}
         logoUrl={siteSettings?.logo_url || siteSettings?.logo || null}
@@ -160,7 +178,7 @@ export default async function HomePage(props: HomePageProps) {
 
       {/* 3. Footer via Active Theme */}
       <renderers.FooterRenderer
-        name={siteSettings?.name || 'Mohamed Khaled'}
+        name={siteSettings?.name || 'Mohamed Alaa'}
         role={siteSettings?.professional_title || 'Machine Learning Engineer'}
         sections={visibleSections}
       />

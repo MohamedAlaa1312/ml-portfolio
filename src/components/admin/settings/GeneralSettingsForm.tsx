@@ -35,11 +35,11 @@ export const GeneralSettingsForm: React.FC<GeneralSettingsFormProps> = ({
         <div className="md:col-span-2">
           <Input
             label="Website Name"
-            helperText="The global brand or site title (e.g. 'Mohamed Khaled Portfolio' or 'MK AI Lab')."
+            helperText="The global brand or site title (e.g. 'Mohamed Alaa Portfolio' or 'MA AI Lab')."
             type="text"
             value={settings.site_name || ''}
             onChange={(e) => onChange('site_name', e.target.value)}
-            placeholder="e.g. Mohamed Khaled Portfolio"
+            placeholder="e.g. Mohamed Alaa Portfolio"
             required
           />
         </div>
@@ -52,7 +52,7 @@ export const GeneralSettingsForm: React.FC<GeneralSettingsFormProps> = ({
             rows={3}
             value={settings.site_description || ''}
             onChange={(e) => onChange('site_description', e.target.value)}
-            placeholder="e.g. Portfolio of Mohamed Khaled, Machine Learning Engineer specializing in AI, Deep Learning, and data-driven systems."
+            placeholder="e.g. Portfolio of Mohamed Alaa, Machine Learning Engineer specializing in AI, Deep Learning, and data-driven systems."
           />
         </div>
 

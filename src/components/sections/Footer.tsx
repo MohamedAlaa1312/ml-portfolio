@@ -8,7 +8,7 @@ interface FooterProps {
 }
 
 export const Footer: React.FC<FooterProps> = ({
-  name = 'Mohamed Khaled',
+  name = 'Mohamed Alaa',
   role = 'Machine Learning Engineer',
 }) => {
   return (
@@ -17,7 +17,7 @@ export const Footer: React.FC<FooterProps> = ({
         {/* Brand & Identity */}
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center font-bold text-black text-sm shadow-md shadow-amber-500/20">
-            MK
+            MA
           </div>
           <div>
             <p className="text-sm font-bold text-slate-200 leading-tight">

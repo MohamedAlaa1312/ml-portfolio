@@ -16,7 +16,7 @@ interface NavbarProps {
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
-  name = 'Mohamed Khaled',
+  name = 'Mohamed Alaa',
   role = 'Machine Learning Engineer',
   resumeUrl = '/documents/resume.pdf',
   logoUrl,

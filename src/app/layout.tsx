@@ -18,55 +18,75 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://mohamedkhaled.dev';
-const validBaseUrl = siteUrl.startsWith('http') ? siteUrl : `https://${siteUrl}`;
+import { CmsService } from "@/services/cms.service";
 
-export const metadata: Metadata = {
-  metadataBase: new URL(validBaseUrl),
-  title: "Mohamed Khaled | Machine Learning Engineer",
-  description:
-    "Production-grade Machine Learning Engineer portfolio showcasing AI architectures, deep learning models, scalable data pipelines, and verified credentials.",
-  keywords: [
-    "Machine Learning Engineer",
-    "Artificial Intelligence",
-    "Deep Learning",
-    "Data Science",
-    "Python",
-    "PyTorch",
-    "TensorFlow",
-    "Mohamed Khaled",
-  ],
-  authors: [{ name: "Mohamed Khaled" }],
-  creator: "Mohamed Khaled",
-  openGraph: {
-    title: "Mohamed Khaled | Machine Learning Engineer",
-    description:
-      "Production-grade Machine Learning Engineer portfolio showcasing AI architectures, deep learning models, scalable data pipelines, and verified credentials.",
-    url: validBaseUrl,
-    siteName: "Mohamed Khaled Portfolio",
-    images: [
-      {
-        url: "/images/profile.jpg",
-        width: 800,
-        height: 1000,
-        alt: "Mohamed Khaled — Machine Learning Engineer",
-      },
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await CmsService.getSiteSettings().catch(() => null);
+  const siteName = settings?.site_name || settings?.name || "Mohamed Alaa";
+  const title = settings?.seo_title || `${siteName} | Machine Learning Engineer Portfolio`;
+  const description =
+    settings?.seo_description ||
+    settings?.site_description ||
+    "Machine Learning Engineer portfolio showcasing AI architectures, deep learning models, data science pipelines, and verified certifications.";
+
+  const productionOrigin =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null) ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
+    'https://ml-portfolio-theta.vercel.app';
+
+  const rawOg = settings?.og_image_url || settings?.og_image || '/images/og-preview.jpg';
+  const ogImageUrl = rawOg.startsWith('http')
+    ? rawOg
+    : `${productionOrigin}${rawOg.startsWith('/') ? '' : '/'}${rawOg}`;
+
+  return {
+    metadataBase: new URL(productionOrigin),
+    title,
+    description,
+    keywords: [
+      "Machine Learning Engineer",
+      "Artificial Intelligence",
+      "Deep Learning",
+      "Data Science",
+      "Python",
+      "PyTorch",
+      "TensorFlow",
+      siteName,
+      "Mohamed Alaa",
     ],
-    locale: "en_US",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Mohamed Khaled | Machine Learning Engineer",
-    description:
-      "Machine Learning Engineer portfolio showcasing AI architectures, deep learning models, and scalable data pipelines.",
-    images: ["/images/profile.jpg"],
-  },
-  robots: {
-    index: true,
-    follow: true,
-  },
-};
+    authors: [{ name: siteName }],
+    creator: siteName,
+    openGraph: {
+      title,
+      description,
+      url: productionOrigin,
+      siteName: settings?.site_name || `${siteName} Portfolio`,
+      images: [
+        {
+          url: ogImageUrl,
+          width: 1200,
+          height: 630,
+          alt: `${siteName} — Machine Learning Engineer Portfolio`,
+          type: 'image/jpeg',
+        },
+      ],
+      locale: "en_US",
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [ogImageUrl],
+      creator: "@MohamedAlaa",
+    },
+    robots: {
+      index: settings?.allow_indexing !== false,
+      follow: settings?.allow_indexing !== false,
+    },
+  };
+}
 
 export default function RootLayout({
   children,

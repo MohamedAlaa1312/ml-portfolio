@@ -4,7 +4,7 @@ import React from 'react';
 import type { ThemeFooterProps } from '../../types';
 
 export const PrecisionFooter: React.FC<ThemeFooterProps> = ({
-  name = 'Mohamed Khaled',
+  name = 'Mohamed Alaa',
   role = 'Machine Learning Engineer',
   sections,
 }) => {

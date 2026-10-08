@@ -5,7 +5,7 @@ import type { ThemeHeroProps } from '../../types';
 import { parseSocialLinks, getPlatformIcon } from '@/lib/social-utils';
 
 export const PrecisionHero: React.FC<ThemeHeroProps> = ({ content, settings }) => {
-  const name = settings?.name || 'Mohamed Khaled';
+  const name = settings?.name || 'Mohamed Alaa';
   const role = settings?.professional_title || 'Machine Learning Engineer';
   const summary =
     content?.summary ||

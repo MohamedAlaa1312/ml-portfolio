@@ -40,7 +40,7 @@ export const SEOSettingsForm: React.FC<SEOSettingsFormProps> = ({
             type="text"
             value={settings.seo_title || ''}
             onChange={(e) => onChange('seo_title', e.target.value)}
-            placeholder="e.g. Mohamed Khaled | Machine Learning Engineer Portfolio"
+            placeholder="e.g. Mohamed Alaa | Machine Learning Engineer Portfolio"
             required
           />
         </div>
@@ -53,7 +53,7 @@ export const SEOSettingsForm: React.FC<SEOSettingsFormProps> = ({
             rows={3}
             value={settings.seo_description || ''}
             onChange={(e) => onChange('seo_description', e.target.value)}
-            placeholder="e.g. Portfolio of Mohamed Khaled, Machine Learning Engineer specializing in AI, Deep Learning, and data-driven systems."
+            placeholder="e.g. Portfolio of Mohamed Alaa, Machine Learning Engineer specializing in AI, Deep Learning, and data-driven systems."
             required
           />
         </div>
