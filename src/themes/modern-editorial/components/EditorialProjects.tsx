@@ -1,12 +1,16 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import type { ThemeProjectsProps } from '../../types';
+import type { Project } from '@/lib/supabase/types';
+import { ProjectDetailsModal } from '@/components/ui/ProjectDetailsModal';
 
 export const EditorialProjects: React.FC<ThemeProjectsProps> = ({
   content,
   projectsList = [],
 }) => {
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+
   const badge = content?.badge || 'SELECTED WORKS // 04';
   const title = content?.title || 'Featured Projects';
   const subtitle =
@@ -52,7 +56,8 @@ export const EditorialProjects: React.FC<ThemeProjectsProps> = ({
             return (
               <article
                 key={project.id}
-                className="group rounded bg-[#121417] border border-white/[0.08] hover:border-white/[0.2] transition-all flex flex-col justify-between overflow-hidden"
+                onClick={() => setSelectedProject(project)}
+                className="group rounded bg-[#121417] border border-white/[0.08] hover:border-white/[0.25] transition-all flex flex-col justify-between overflow-hidden cursor-pointer hover:shadow-xl hover:shadow-black/60"
               >
                 <div>
                   {/* Media Frame */}
@@ -79,11 +84,16 @@ export const EditorialProjects: React.FC<ThemeProjectsProps> = ({
                       <span className="text-[#C25E34]">PRODUCTION</span>
                     </div>
 
-                    <h3 className="text-xl font-semibold text-[#EDEDEC] group-hover:text-white transition-colors">
-                      {project.title}
-                    </h3>
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="text-xl font-semibold text-[#EDEDEC] group-hover:text-white transition-colors">
+                        {project.title}
+                      </h3>
+                      <span className="text-xs font-mono text-[#C25E34] opacity-75 group-hover:opacity-100 transition-opacity shrink-0">
+                        ↗
+                      </span>
+                    </div>
 
-                    <p className="text-sm text-[#A1A1AA] leading-relaxed">
+                    <p className="text-sm text-[#A1A1AA] leading-relaxed line-clamp-3">
                       {project.short_description}
                     </p>
 
@@ -103,18 +113,31 @@ export const EditorialProjects: React.FC<ThemeProjectsProps> = ({
                   </div>
                 </div>
 
-                {/* Editorial Actions (GitHub, Live URL) */}
-                {hasLinks && (
-                  <div className="px-6 sm:px-7 py-4 border-t border-white/[0.06] flex items-center justify-between text-xs font-mono">
+                {/* Editorial Actions (Details, GitHub, Live URL) */}
+                <div className="px-6 sm:px-7 py-4 border-t border-white/[0.06] flex items-center justify-between text-xs font-mono flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedProject(project);
+                    }}
+                    className="text-[#EDEDEC] hover:text-[#C25E34] transition-colors inline-flex items-center gap-1 font-semibold"
+                  >
+                    <span>CASE DETAILS</span>
+                    <span>↗</span>
+                  </button>
+
+                  <div className="flex items-center gap-4 ml-auto">
                     {project.github_url && (
                       <a
                         href={project.github_url}
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
                         className="text-[#A1A1AA] hover:text-[#EDEDEC] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#C25E34] rounded inline-flex items-center gap-1"
                         aria-label={`Source code for ${project.title}`}
                       >
-                        <span>SOURCE CODE</span>
+                        <span>SOURCE</span>
                         <span>↗</span>
                       </a>
                     )}
@@ -123,15 +146,16 @@ export const EditorialProjects: React.FC<ThemeProjectsProps> = ({
                         href={project.live_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-[#C25E34] hover:text-[#D97746] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#C25E34] rounded inline-flex items-center gap-1 ml-auto"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-[#C25E34] hover:text-[#D97746] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#C25E34] rounded inline-flex items-center gap-1"
                         aria-label={`Live system for ${project.title}`}
                       >
-                        <span>LIVE SYSTEM</span>
+                        <span>DEMO</span>
                         <span>↗</span>
                       </a>
                     )}
                   </div>
-                )}
+                </div>
               </article>
             );
           })}
@@ -141,6 +165,13 @@ export const EditorialProjects: React.FC<ThemeProjectsProps> = ({
           NO PUBLISHED PROJECTS FOUND
         </div>
       )}
+
+      {/* Project Details Modal */}
+      <ProjectDetailsModal
+        project={selectedProject}
+        isOpen={Boolean(selectedProject)}
+        onClose={() => setSelectedProject(null)}
+      />
     </section>
   );
 };

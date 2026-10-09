@@ -1,13 +1,17 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import type { ThemeProjectsProps } from '../../types';
+import type { Project } from '@/lib/supabase/types';
+import { ProjectDetailsModal } from '@/components/ui/ProjectDetailsModal';
 
 export const MonochromeProjects: React.FC<ThemeProjectsProps> = ({
   content,
   projectsList = [],
   sectionIndex,
 }) => {
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+
   const title = content?.title || 'Selected Projects';
   const subtitle =
     content?.subtitle ||
@@ -55,7 +59,8 @@ export const MonochromeProjects: React.FC<ThemeProjectsProps> = ({
             return (
               <article
                 key={project.id}
-                className="py-12 sm:py-16 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center group"
+                onClick={() => setSelectedProject(project)}
+                className="py-12 sm:py-16 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center group cursor-pointer hover:bg-white/[0.02] px-3 sm:px-4 -mx-3 sm:-mx-4 transition-colors"
               >
                 {/* Media Column (col-6) */}
                 <div className="lg:col-span-6">
@@ -80,14 +85,14 @@ export const MonochromeProjects: React.FC<ThemeProjectsProps> = ({
                 <div className="lg:col-span-6 space-y-4">
                   <div className="flex items-center justify-between text-xs font-mono uppercase tracking-widest text-[#737373]">
                     <span className="text-white font-bold">PROJECT {indexStr}</span>
-                    <span>PRODUCTION SYSTEM</span>
+                    <span>CLICK FOR DETAILS ↗</span>
                   </div>
 
                   <h3 className="text-2xl sm:text-3xl font-black text-white uppercase tracking-tight group-hover:text-neutral-300 transition-colors">
                     {project.title}
                   </h3>
 
-                  <p className="text-base text-[#A3A3A3] leading-relaxed">
+                  <p className="text-base text-[#A3A3A3] leading-relaxed line-clamp-3">
                     {project.short_description}
                   </p>
 
@@ -105,35 +110,47 @@ export const MonochromeProjects: React.FC<ThemeProjectsProps> = ({
                     </div>
                   )}
 
-                  {/* Links */}
-                  {hasLinks && (
-                    <div className="pt-4 border-t border-white/10 flex flex-wrap items-center gap-6 text-xs font-mono uppercase tracking-wider">
-                      {project.github_url && (
-                        <a
-                          href={project.github_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-white hover:text-neutral-400 underline underline-offset-4 decoration-white/40 hover:decoration-white transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white inline-flex items-center gap-1"
-                          aria-label={`Source repository for ${project.title}`}
-                        >
-                          <span>SOURCE CODE</span>
-                          <span>↗</span>
-                        </a>
-                      )}
-                      {project.live_url && (
-                        <a
-                          href={project.live_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-white hover:text-neutral-400 underline underline-offset-4 decoration-white/40 hover:decoration-white transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white inline-flex items-center gap-1"
-                          aria-label={`Live deployment for ${project.title}`}
-                        >
-                          <span>LIVE DEMO</span>
-                          <span>↗</span>
-                        </a>
-                      )}
-                    </div>
-                  )}
+                  {/* Links & Details Action */}
+                  <div className="pt-4 border-t border-white/10 flex flex-wrap items-center gap-6 text-xs font-mono uppercase tracking-wider">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedProject(project);
+                      }}
+                      className="text-white hover:text-neutral-300 font-bold underline underline-offset-4 inline-flex items-center gap-1"
+                    >
+                      <span>VIEW SPECS</span>
+                      <span>↗</span>
+                    </button>
+
+                    {project.github_url && (
+                      <a
+                        href={project.github_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-white hover:text-neutral-400 underline underline-offset-4 decoration-white/40 hover:decoration-white transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white inline-flex items-center gap-1"
+                        aria-label={`Source repository for ${project.title}`}
+                      >
+                        <span>SOURCE CODE</span>
+                        <span>↗</span>
+                      </a>
+                    )}
+                    {project.live_url && (
+                      <a
+                        href={project.live_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-white hover:text-neutral-400 underline underline-offset-4 decoration-white/40 hover:decoration-white transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white inline-flex items-center gap-1"
+                        aria-label={`Live deployment for ${project.title}`}
+                      >
+                        <span>LIVE DEMO</span>
+                        <span>↗</span>
+                      </a>
+                    )}
+                  </div>
                 </div>
               </article>
             );
@@ -144,6 +161,13 @@ export const MonochromeProjects: React.FC<ThemeProjectsProps> = ({
           NO CASE STUDY RECORDS AVAILABLE
         </div>
       )}
+
+      {/* Project Details Modal */}
+      <ProjectDetailsModal
+        project={selectedProject}
+        isOpen={Boolean(selectedProject)}
+        onClose={() => setSelectedProject(null)}
+      />
     </section>
   );
 };

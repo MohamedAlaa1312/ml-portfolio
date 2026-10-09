@@ -46,13 +46,22 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({
   const [shortDescription, setShortDescription] = useState(initialData?.short_description || '');
   const [fullDescription, setFullDescription] = useState(initialData?.full_description || '');
 
-  // Media
+  // Media - Cover & Gallery
   const [thumbnailUrl, setThumbnailUrl] = useState(
     initialData?.thumbnail_url || initialData?.thumbnail || ''
   );
+  const [galleryUrls, setGalleryUrls] = useState<string[]>(() => {
+    if (Array.isArray(initialData?.gallery_urls)) return [...initialData.gallery_urls];
+    if (Array.isArray((initialData as any)?.gallery)) return [...(initialData as any).gallery];
+    return [];
+  });
   const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+  const [isUploadingGallery, setIsUploadingGallery] = useState(false);
   const [isMediaSelectorOpen, setIsMediaSelectorOpen] = useState(false);
+  const [isGalleryMediaSelectorOpen, setIsGalleryMediaSelectorOpen] = useState(false);
+  const [manualGalleryUrl, setManualGalleryUrl] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const galleryFileInputRef = useRef<HTMLInputElement>(null);
 
   // Technologies
   const [technologies, setTechnologies] = useState<string[]>(
@@ -128,7 +137,7 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({
     setIsDirty(true);
   };
 
-  // Media upload handler
+  // Single Media upload handler (Cover image)
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -163,6 +172,7 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({
       }
 
       setThumbnailUrl(data.url);
+      setGalleryUrls((prev) => (prev.includes(data.url) ? prev : [data.url, ...prev]));
       setIsDirty(true);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Media upload failed';
@@ -171,6 +181,113 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({
       setIsUploadingMedia(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
+  };
+
+  // Multi-photo batch upload handler (Gallery images)
+  const handleGalleryFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'];
+    for (const f of files) {
+      if (!validTypes.includes(f.type)) {
+        setErrors((prev) => ({ ...prev, gallery: `Invalid format for "${f.name}". Allowed: JPEG, PNG, WEBP, SVG.` }));
+        return;
+      }
+      if (f.size > 5 * 1024 * 1024) {
+        setErrors((prev) => ({ ...prev, gallery: `"${f.name}" exceeds the 5MB size limit.` }));
+        return;
+      }
+    }
+
+    setIsUploadingGallery(true);
+    setErrors((prev) => ({ ...prev, gallery: '' }));
+
+    try {
+      const formData = new FormData();
+      files.forEach((f) => formData.append('files', f));
+      formData.append('bucket', 'portfolio-images');
+
+      const res = await fetch('/api/admin/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to upload gallery images.');
+      }
+
+      const newUrls: string[] = Array.isArray(data.urls)
+        ? data.urls
+        : data.url
+        ? [data.url]
+        : [];
+
+      if (newUrls.length > 0) {
+        setGalleryUrls((prev) => {
+          const combined = [...prev];
+          newUrls.forEach((u) => {
+            if (u && !combined.includes(u)) combined.push(u);
+          });
+          return combined;
+        });
+
+        // If no cover thumbnail yet, assign the first uploaded photo
+        if (!thumbnailUrl) {
+          setThumbnailUrl(newUrls[0]);
+        }
+        setIsDirty(true);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Gallery upload failed';
+      setErrors((prev) => ({ ...prev, gallery: msg }));
+    } finally {
+      setIsUploadingGallery(false);
+      if (galleryFileInputRef.current) galleryFileInputRef.current.value = '';
+    }
+  };
+
+  // Manual URL add to gallery
+  const addManualGalleryUrl = () => {
+    const u = manualGalleryUrl.trim();
+    if (!u) return;
+    if (!galleryUrls.includes(u)) {
+      setGalleryUrls((prev) => [...prev, u]);
+      if (!thumbnailUrl) setThumbnailUrl(u);
+      setIsDirty(true);
+    }
+    setManualGalleryUrl('');
+  };
+
+  // Remove photo from gallery
+  const removeGalleryPhoto = (urlToRemove: string) => {
+    setGalleryUrls((prev) => prev.filter((u) => u !== urlToRemove));
+    if (thumbnailUrl === urlToRemove) {
+      const remaining = galleryUrls.filter((u) => u !== urlToRemove);
+      setThumbnailUrl(remaining[0] || '');
+    }
+    setIsDirty(true);
+  };
+
+  // Set photo as cover
+  const makeCover = (url: string) => {
+    setThumbnailUrl(url);
+    setIsDirty(true);
+  };
+
+  // Reorder photos
+  const moveGalleryPhoto = (idx: number, direction: 'left' | 'right') => {
+    const targetIdx = direction === 'left' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= galleryUrls.length) return;
+    setGalleryUrls((prev) => {
+      const next = [...prev];
+      const temp = next[idx];
+      next[idx] = next[targetIdx];
+      next[targetIdx] = temp;
+      return next;
+    });
+    setIsDirty(true);
   };
 
   // Form submission
@@ -224,14 +341,18 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({
       }
     }
 
-    const payload: Partial<Project> = {
+    const finalThumbnail = thumbnailUrl.trim() || galleryUrls[0] || null;
+
+    const payload: Partial<Project> & { gallery?: string[] } = {
       ...(initialData?.id ? { id: initialData.id } : {}),
       title: title.trim(),
       slug: finalSlug,
       short_description: shortDescription.trim(),
       full_description: fullDescription.trim(),
-      thumbnail: thumbnailUrl.trim() || null,
-      thumbnail_url: thumbnailUrl.trim() || null,
+      thumbnail: finalThumbnail,
+      thumbnail_url: finalThumbnail,
+      gallery_urls: galleryUrls,
+      gallery: galleryUrls,
       technologies,
       github_url: githubUrl.trim() || null,
       live_url: liveUrl.trim() || null,
@@ -472,7 +593,7 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({
                 }}
                 className="text-xs text-red-400 hover:text-red-300 underline cursor-pointer"
               >
-                Remove Image
+                Remove Cover Image
               </button>
             )}
 
@@ -480,6 +601,188 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({
             {errors.thumbnail_url && <p className="text-xs text-red-400">{errors.thumbnail_url}</p>}
           </div>
         </div>
+      </div>
+
+      {/* 5b. Project Photo Gallery / Screenshots (Multi-Photo) */}
+      <div className="space-y-3 p-4 bg-white/[0.02] border border-white/10 rounded-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-300">
+                Project Photo Gallery & Screenshots
+              </label>
+              <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                {galleryUrls.length} {galleryUrls.length === 1 ? 'photo' : 'photos'}
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Upload multiple screenshots or diagrams. Users will see all of them in the interactive project modal.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              onClick={() => galleryFileInputRef.current?.click()}
+              isLoading={isUploadingGallery}
+              className="text-xs font-mono"
+            >
+              📷 Upload Photos (Multiple)
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsGalleryMediaSelectorOpen(true)}
+              className="border-amber-500/30 text-amber-300 hover:bg-amber-500/10 font-mono text-xs"
+            >
+              📁 From Media
+            </Button>
+          </div>
+        </div>
+
+        {/* Hidden Multi-file input */}
+        <input
+          type="file"
+          ref={galleryFileInputRef}
+          onChange={handleGalleryFileUpload}
+          accept="image/png,image/jpeg,image/webp,image/svg+xml"
+          multiple
+          className="hidden"
+        />
+
+        {/* Media Selector Modal for Gallery */}
+        <MediaSelectorModal
+          isOpen={isGalleryMediaSelectorOpen}
+          onClose={() => setIsGalleryMediaSelectorOpen(false)}
+          allowedTypes={['image']}
+          title="Add Images to Project Gallery"
+          onSelect={(m) => {
+            if (!galleryUrls.includes(m.public_url)) {
+              setGalleryUrls((prev) => [...prev, m.public_url]);
+              if (!thumbnailUrl) setThumbnailUrl(m.public_url);
+              setIsDirty(true);
+            }
+          }}
+        />
+
+        {/* Quick URL Adder */}
+        <div className="flex gap-2 pt-1">
+          <Input
+            value={manualGalleryUrl}
+            onChange={(e) => setManualGalleryUrl(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                addManualGalleryUrl();
+              }
+            }}
+            placeholder="Paste image URL to append to gallery and press Add..."
+            className="text-xs"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={addManualGalleryUrl}
+            disabled={!manualGalleryUrl.trim()}
+          >
+            Add URL
+          </Button>
+        </div>
+
+        {errors.gallery && <p className="text-xs text-red-400">{errors.gallery}</p>}
+
+        {/* Gallery Thumbnails Reel / Grid */}
+        {galleryUrls.length > 0 ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 pt-2">
+            {galleryUrls.map((url, idx) => {
+              const isCover = thumbnailUrl === url;
+              return (
+                <div
+                  key={url + idx}
+                  className={`group relative rounded-lg overflow-hidden border bg-[#0A0D14] transition-all ${
+                    isCover
+                      ? 'border-amber-400 ring-2 ring-amber-400/20'
+                      : 'border-white/10 hover:border-white/20'
+                  }`}
+                >
+                  <div className="aspect-[16/9] w-full overflow-hidden bg-black/40">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={url}
+                      alt={`Gallery item ${idx + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+
+                  {/* Badges */}
+                  <div className="absolute top-1.5 left-1.5 flex items-center gap-1">
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-black/75 text-white border border-white/10">
+                      #{idx + 1}
+                    </span>
+                    {isCover && (
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-amber-500 text-slate-950 font-bold shadow">
+                        COVER
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Actions overlay */}
+                  <div className="p-1.5 bg-[#0D1017] border-t border-white/5 flex items-center justify-between text-[10px]">
+                    <div className="flex items-center gap-1">
+                      {idx > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => moveGalleryPhoto(idx, 'left')}
+                          title="Move left"
+                          className="px-1.5 py-0.5 rounded bg-white/5 hover:bg-white/15 text-slate-300"
+                        >
+                          ◀
+                        </button>
+                      )}
+                      {idx < galleryUrls.length - 1 && (
+                        <button
+                          type="button"
+                          onClick={() => moveGalleryPhoto(idx, 'right')}
+                          title="Move right"
+                          className="px-1.5 py-0.5 rounded bg-white/5 hover:bg-white/15 text-slate-300"
+                        >
+                          ▶
+                        </button>
+                      )}
+                      {!isCover && (
+                        <button
+                          type="button"
+                          onClick={() => makeCover(url)}
+                          title="Set as Cover Thumbnail"
+                          className="px-1.5 py-0.5 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/20"
+                        >
+                          Make Cover
+                        </button>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => removeGalleryPhoto(url)}
+                      title="Remove photo"
+                      className="px-1.5 py-0.5 rounded bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="p-4 border border-dashed border-white/10 rounded-lg text-center font-mono text-xs text-slate-500">
+            No gallery screenshots added yet. Click &quot;Upload Photos&quot; to select one or more images.
+          </div>
+        )}
       </div>
 
       {/* 6. External Links */}

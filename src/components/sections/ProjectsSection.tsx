@@ -1,9 +1,13 @@
-import React from 'react';
+'use client';
+
+import React, { useState } from 'react';
 import { SectionHeading } from '@/components/ui/SectionHeading';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Tag } from '@/components/ui/Tag';
 import { TextLink } from '@/components/ui/TextLink';
 import { MediaFrame } from '@/components/ui/MediaFrame';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ProjectDetailsModal } from '@/components/ui/ProjectDetailsModal';
 import type { Project, ProjectsContent } from '@/lib/supabase/types';
 
 interface ProjectsSectionProps {
@@ -11,12 +15,12 @@ interface ProjectsSectionProps {
   projectsList?: Project[];
 }
 
-import { EmptyState } from '@/components/ui/EmptyState';
-
 export const ProjectsSection: React.FC<ProjectsSectionProps> = ({
   content,
   projectsList,
 }) => {
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+
   const badge = content?.badge || 'Portfolio';
   const title = content?.title || 'Featured Projects';
   const subtitle =
@@ -38,7 +42,8 @@ export const ProjectsSection: React.FC<ProjectsSectionProps> = ({
             <Card
               key={project.id}
               variant="interactive"
-              className="group flex flex-col justify-between"
+              onClick={() => setSelectedProject(project)}
+              className="group flex flex-col justify-between cursor-pointer hover:border-amber-400/40 transition-all"
             >
               <div>
                 {/* Media Thumbnail */}
@@ -51,11 +56,16 @@ export const ProjectsSection: React.FC<ProjectsSectionProps> = ({
                 />
 
                 <CardContent className="p-6 space-y-3">
-                  <h3 className="text-xl font-bold text-slate-100 group-hover:text-amber-400 transition-colors">
-                    {project.title}
-                  </h3>
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="text-xl font-bold text-slate-100 group-hover:text-amber-400 transition-colors">
+                      {project.title}
+                    </h3>
+                    <span className="text-xs font-mono text-amber-400 opacity-75 group-hover:opacity-100 transition-opacity shrink-0">
+                      ↗
+                    </span>
+                  </div>
 
-                  <p className="text-xs md:text-sm text-slate-300 leading-relaxed">
+                  <p className="text-xs md:text-sm text-slate-300 leading-relaxed line-clamp-3">
                     {project.short_description}
                   </p>
 
@@ -71,27 +81,43 @@ export const ProjectsSection: React.FC<ProjectsSectionProps> = ({
               </div>
 
               {/* Action Links */}
-              <div className="p-6 pt-0 flex items-center justify-between border-t border-white/5 text-xs font-mono">
-                {project.github_url && (
-                  <TextLink
-                    href={project.github_url}
-                    isExternal
-                    variant="amber"
-                    aria-label={`View source code for ${project.title}`}
-                  >
-                    Source Code ↗
-                  </TextLink>
-                )}
-                {project.live_url && (
-                  <TextLink
-                    href={project.live_url}
-                    isExternal
-                    variant="subtle"
-                    aria-label={`View live demo for ${project.title}`}
-                  >
-                    Live Demo ↗
-                  </TextLink>
-                )}
+              <div className="p-6 pt-0 flex items-center justify-between border-t border-white/5 text-xs font-mono flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedProject(project);
+                  }}
+                  className="text-amber-400 hover:text-amber-300 transition-colors font-semibold inline-flex items-center gap-1"
+                >
+                  <span>View Details</span>
+                  <span>↗</span>
+                </button>
+
+                <div className="flex items-center gap-4 ml-auto">
+                  {project.github_url && (
+                    <TextLink
+                      href={project.github_url}
+                      isExternal
+                      variant="subtle"
+                      onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                      aria-label={`View source code for ${project.title}`}
+                    >
+                      Source ↗
+                    </TextLink>
+                  )}
+                  {project.live_url && (
+                    <TextLink
+                      href={project.live_url}
+                      isExternal
+                      variant="amber"
+                      onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                      aria-label={`View live demo for ${project.title}`}
+                    >
+                      Demo ↗
+                    </TextLink>
+                  )}
+                </div>
               </div>
             </Card>
           ))}
@@ -105,6 +131,13 @@ export const ProjectsSection: React.FC<ProjectsSectionProps> = ({
           />
         </div>
       )}
+
+      {/* Project Details Modal */}
+      <ProjectDetailsModal
+        project={selectedProject}
+        isOpen={Boolean(selectedProject)}
+        onClose={() => setSelectedProject(null)}
+      />
     </section>
   );
 };

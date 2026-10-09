@@ -105,6 +105,13 @@ export const ProjectList: React.FC<ProjectListProps> = ({
                       </Badge>
                     )}
 
+                    {/* Gallery Photos Count */}
+                    {Array.isArray(project.gallery_urls) && project.gallery_urls.length > 0 && (
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-300 border border-blue-500/30">
+                        📷 {project.gallery_urls.length} photos
+                      </span>
+                    )}
+
                     <span className="text-[11px] font-mono text-slate-400">
                       /{project.slug}
                     </span>

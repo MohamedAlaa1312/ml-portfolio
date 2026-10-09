@@ -1,13 +1,17 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import type { ThemeProjectsProps } from '../../types';
+import type { Project } from '@/lib/supabase/types';
+import { ProjectDetailsModal } from '@/components/ui/ProjectDetailsModal';
 
 export const PrecisionProjects: React.FC<ThemeProjectsProps> = ({
   content,
   projectsList = [],
   sectionIndex,
 }) => {
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+
   const title = content?.title || 'Applied Engineering Systems';
   const subtitle =
     content?.subtitle ||
@@ -54,13 +58,14 @@ export const PrecisionProjects: React.FC<ThemeProjectsProps> = ({
             return (
               <article
                 key={project.id}
-                className="rounded-sm bg-[#0E1014] border border-white/[0.08] hover:border-[#F59E0B]/50 transition-all flex flex-col justify-between overflow-hidden group"
+                onClick={() => setSelectedProject(project)}
+                className="rounded-sm bg-[#0E1014] border border-white/[0.08] hover:border-[#F59E0B]/60 transition-all flex flex-col justify-between overflow-hidden group cursor-pointer hover:shadow-lg hover:shadow-black/50"
               >
                 <div>
                   {/* Top Spec Header Bar */}
                   <div className="px-5 py-2.5 bg-[#12151B] border-b border-white/[0.06] flex items-center justify-between text-[10px] font-mono text-[#64748B]">
                     <span className="text-[#F59E0B] font-bold">{projectCode}</span>
-                    <span>DEPLOYMENT: ACTIVE</span>
+                    <span className="group-hover:text-amber-400 transition-colors">CLICK FOR DETAILS // VIEW SPECS ↗</span>
                   </div>
 
                   {/* Media Frame */}
@@ -70,7 +75,7 @@ export const PrecisionProjects: React.FC<ThemeProjectsProps> = ({
                       <img
                         src={project.thumbnail_url}
                         alt={`Preview for ${project.title}`}
-                        className="w-full h-full object-cover filter contrast-[1.03] group-hover:scale-[1.01] transition-transform duration-200"
+                        className="w-full h-full object-cover filter contrast-[1.03] group-hover:scale-[1.02] transition-transform duration-200"
                         loading="lazy"
                       />
                     </div>
@@ -82,11 +87,16 @@ export const PrecisionProjects: React.FC<ThemeProjectsProps> = ({
 
                   {/* Project Details */}
                   <div className="p-5 sm:p-6 space-y-3">
-                    <h3 className="text-lg font-bold text-[#F1F5F9] font-sans group-hover:text-white transition-colors">
-                      {project.title}
-                    </h3>
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="text-lg font-bold text-[#F1F5F9] font-sans group-hover:text-amber-400 transition-colors">
+                        {project.title}
+                      </h3>
+                      <span className="text-xs font-mono text-[#F59E0B] opacity-75 group-hover:opacity-100 transition-opacity shrink-0">
+                        ↗
+                      </span>
+                    </div>
 
-                    <p className="text-xs sm:text-sm text-[#94A3B8] leading-relaxed">
+                    <p className="text-xs sm:text-sm text-[#94A3B8] leading-relaxed line-clamp-3">
                       {project.short_description}
                     </p>
 
@@ -106,19 +116,32 @@ export const PrecisionProjects: React.FC<ThemeProjectsProps> = ({
                   </div>
                 </div>
 
-                {/* Technical Links Dock */}
-                {hasLinks && (
-                  <div className="px-5 sm:px-6 py-3 bg-[#12151B] border-t border-white/[0.06] flex items-center justify-between text-xs font-mono">
+                {/* Technical Links & Details Dock */}
+                <div className="px-5 sm:px-6 py-3 bg-[#12151B] border-t border-white/[0.06] flex items-center justify-between text-xs font-mono flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedProject(project);
+                    }}
+                    className="text-[#F1F5F9] hover:text-[#F59E0B] transition-colors inline-flex items-center gap-1 font-bold"
+                  >
+                    <span className="text-[#F59E0B]">[DETAILS]</span>
+                    <span>OVERVIEW ↗</span>
+                  </button>
+
+                  <div className="flex items-center gap-4 ml-auto">
                     {project.github_url && (
                       <a
                         href={project.github_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-[#94A3B8] hover:text-[#F1F5F9] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#F59E0B] rounded-sm inline-flex items-center gap-1.5"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-[#94A3B8] hover:text-[#F1F5F9] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#F59E0B] rounded-sm inline-flex items-center gap-1"
                         aria-label={`Source repository for ${project.title}`}
                       >
                         <span className="text-[#64748B]">[CODE]</span>
-                        <span>REPOSITORY ↗</span>
+                        <span>REPO ↗</span>
                       </a>
                     )}
                     {project.live_url && (
@@ -126,7 +149,8 @@ export const PrecisionProjects: React.FC<ThemeProjectsProps> = ({
                         href={project.live_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-[#F59E0B] hover:text-[#D97706] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#F59E0B] rounded-sm inline-flex items-center gap-1.5 ml-auto"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-[#F59E0B] hover:text-[#D97706] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#F59E0B] rounded-sm inline-flex items-center gap-1"
                         aria-label={`Live system deployment for ${project.title}`}
                       >
                         <span className="text-[#F59E0B]/60">[LIVE]</span>
@@ -134,7 +158,7 @@ export const PrecisionProjects: React.FC<ThemeProjectsProps> = ({
                       </a>
                     )}
                   </div>
-                )}
+                </div>
               </article>
             );
           })}
@@ -144,6 +168,13 @@ export const PrecisionProjects: React.FC<ThemeProjectsProps> = ({
           NO SYSTEMS LOGGED IN PRODUCTION DIRECTORY
         </div>
       )}
+
+      {/* Project Details Modal */}
+      <ProjectDetailsModal
+        project={selectedProject}
+        isOpen={Boolean(selectedProject)}
+        onClose={() => setSelectedProject(null)}
+      />
     </section>
   );
 };
