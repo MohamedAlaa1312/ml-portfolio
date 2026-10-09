@@ -124,8 +124,10 @@ export async function PATCH(request: Request, context: RouteContext) {
     const updated = await AdminService.updateSection(existing.id, updates);
 
     try {
-      revalidatePath('/');
+      revalidatePath('/', 'layout');
       revalidatePath('/admin/sections');
+      revalidatePath('/admin/dashboard');
+      revalidatePath('/admin/projects');
     } catch {
       // non-blocking
     }

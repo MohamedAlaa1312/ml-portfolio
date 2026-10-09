@@ -18,6 +18,7 @@ import type {
   ContactContent,
   CmsDraft,
   DraftEntityType,
+  PublishStatus,
 } from '@/lib/supabase/types';
 import { parseSocialLinks } from '@/lib/social-utils';
 
@@ -130,9 +131,11 @@ export const AdminService = {
 
       let res;
       if (existing?.id) {
+        const updatePayload = { ...payload };
+        delete updatePayload.id;
         res = await (supabase as any)
           .from('sections')
-          .update(payload)
+          .update(updatePayload)
           .eq('id', existing.id)
           .select()
           .single();
@@ -163,9 +166,12 @@ export const AdminService = {
     }
     try {
       const supabase = await getDbClient();
+      const cleanUpdates: any = { ...updates, updated_at: new Date().toISOString() };
+      delete cleanUpdates.id;
+
       let query = (supabase as any)
         .from('sections')
-        .update({ ...updates, updated_at: new Date().toISOString() });
+        .update(cleanUpdates);
 
       if (isValidUuid(id)) {
         query = query.eq('id', id);
@@ -268,7 +274,10 @@ export const AdminService = {
         return DevFallbackStore.getAllProjects();
       }
       if (Array.isArray(data) && data.length > 0) {
-        return data as Project[];
+        return (data as any[]).map((p) => ({
+          ...p,
+          enabled: p.enabled !== undefined ? Boolean(p.enabled) : p.status === 'published',
+        })) as Project[];
       }
       return DevFallbackStore.getAllProjects();
     } catch (err) {
@@ -285,7 +294,7 @@ export const AdminService = {
       const supabase = await getDbClient();
       let query = supabase.from('projects').select('*');
       if (isValidUuid(id)) {
-        query = query.or(`id.eq.${id},slug.eq.${id}`);
+        query = query.eq('id', id);
       } else {
         query = query.eq('slug', id);
       }
@@ -295,7 +304,14 @@ export const AdminService = {
         console.error('[AdminService.getProjectById] DB error:', error.message);
         return DevFallbackStore.getProjectById(id);
       }
-      return (data as unknown as Project) || DevFallbackStore.getProjectById(id);
+      if (data) {
+        const p = data as any;
+        return {
+          ...p,
+          enabled: p.enabled !== undefined ? Boolean(p.enabled) : p.status === 'published',
+        } as Project;
+      }
+      return DevFallbackStore.getProjectById(id);
     } catch (err) {
       console.error('[AdminService.getProjectById] Exception:', err);
       return DevFallbackStore.getProjectById(id);
@@ -320,29 +336,76 @@ export const AdminService = {
       // Check for existing project by UUID or slug
       let existing: any = null;
       if (isValidUuid(payload.id)) {
-        const { data } = await supabase.from('projects').select('id').eq('id', payload.id).maybeSingle();
+        const { data } = await supabase
+          .from('projects')
+          .select('id, slug')
+          .eq('id', payload.id)
+          .maybeSingle();
         existing = data;
       } else if (payload.slug) {
-        const { data } = await supabase.from('projects').select('id').eq('slug', payload.slug).maybeSingle();
+        const { data } = await supabase
+          .from('projects')
+          .select('id, slug')
+          .eq('slug', payload.slug)
+          .maybeSingle();
         existing = data;
       }
 
-      if (!isValidUuid(payload.id)) {
-        delete payload.id;
+      // Authoritative status resolution: map enabled boolean to publish_status enum
+      let finalStatus: PublishStatus = payload.status || 'published';
+      if (payload.enabled === false) {
+        finalStatus = finalStatus === 'archived' ? 'archived' : 'draft';
+      } else if (payload.enabled === true && finalStatus === 'draft') {
+        finalStatus = 'published';
       }
+
+      const galleryUrls = Array.isArray(payload.gallery_urls)
+        ? payload.gallery_urls
+        : Array.isArray(payload.gallery)
+        ? payload.gallery
+        : [];
+
+      // Build clean database payload strictly matching columns in PostgreSQL `projects` table
+      const dbPayload: Record<string, any> = {
+        title: payload.title?.trim() ?? 'Untitled Project',
+        slug: payload.slug?.trim() || `project-${Date.now()}`,
+        short_description: payload.short_description?.trim() ?? '',
+        full_description: payload.full_description?.trim() ?? '',
+        thumbnail: payload.thumbnail_url ?? payload.thumbnail ?? null,
+        thumbnail_url: payload.thumbnail_url ?? payload.thumbnail ?? null,
+        gallery: galleryUrls,
+        gallery_urls: galleryUrls,
+        technologies: Array.isArray(payload.technologies) ? payload.technologies : [],
+        github_url: payload.github_url ? payload.github_url.trim() : null,
+        live_url: payload.live_url ? payload.live_url.trim() : null,
+        featured: Boolean(payload.featured),
+        display_order: typeof payload.display_order === 'number' ? payload.display_order : 0,
+        status: finalStatus,
+        updated_at: new Date().toISOString(),
+      };
+
+      // Strip any undefined keys
+      Object.keys(dbPayload).forEach((k) => {
+        if (dbPayload[k] === undefined) delete dbPayload[k];
+      });
 
       let res;
       if (existing?.id) {
+        // UPDATE existing row: strictly DO NOT pass `id` in payload
         res = await (supabase as any)
           .from('projects')
-          .update({ ...payload, updated_at: new Date().toISOString() })
+          .update(dbPayload)
           .eq('id', existing.id)
           .select()
           .single();
       } else {
+        // INSERT new row: only attach id if it is a valid UUID
+        if (isValidUuid(payload.id)) {
+          dbPayload.id = payload.id;
+        }
         res = await (supabase as any)
           .from('projects')
-          .insert({ ...payload, updated_at: new Date().toISOString() })
+          .insert(dbPayload)
           .select()
           .single();
       }
@@ -351,7 +414,11 @@ export const AdminService = {
         console.error('[AdminService.upsertProject] DB error:', res.error.message);
         throw new Error(res.error.message);
       }
-      const resultData = res.data as Project;
+      const row = res.data as any;
+      const resultData: Project = {
+        ...row,
+        enabled: row.enabled !== undefined ? Boolean(row.enabled) : row.status === 'published',
+      };
       DevFallbackStore.upsertProject(resultData);
       return resultData;
     } catch (err) {
@@ -369,7 +436,7 @@ export const AdminService = {
       const supabase = await getDbClient();
       let query = supabase.from('projects').delete();
       if (isValidUuid(id)) {
-        query = query.or(`id.eq.${id},slug.eq.${id}`);
+        query = query.eq('id', id);
       } else {
         query = query.eq('slug', id);
       }
@@ -460,9 +527,11 @@ export const AdminService = {
 
       let res;
       if (existing?.id) {
+        const updatePayload = { ...payload };
+        delete updatePayload.id;
         res = await (supabase as any)
           .from('experience')
-          .update(payload)
+          .update(updatePayload)
           .eq('id', existing.id)
           .select()
           .single();
@@ -625,9 +694,11 @@ export const AdminService = {
 
       let res;
       if (existing?.id) {
+        const updatePayload = { ...payload };
+        delete updatePayload.id;
         res = await (supabase as any)
           .from('skills')
-          .update(payload)
+          .update(updatePayload)
           .eq('id', existing.id)
           .select()
           .single();
@@ -934,9 +1005,11 @@ export const AdminService = {
 
       let res;
       if (existing?.id) {
+        const updatePayload = { ...payload };
+        delete updatePayload.id;
         res = await (supabase as any)
           .from('certifications')
-          .update(payload)
+          .update(updatePayload)
           .eq('id', existing.id)
           .select()
           .single();

@@ -123,7 +123,10 @@ export const CmsService = {
         console.warn('[CmsService.getPublishedProjects] Error:', error.message);
         return DevFallbackStore.getPublishedProjects(featuredOnly);
       }
-      return (data as Project[]) || [];
+      return ((data as any[]) || []).map((p) => ({
+        ...p,
+        enabled: p.enabled !== undefined ? Boolean(p.enabled) : p.status === 'published',
+      })) as Project[];
     } catch {
       return DevFallbackStore.getPublishedProjects(featuredOnly);
     }

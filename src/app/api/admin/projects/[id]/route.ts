@@ -217,9 +217,10 @@ export async function PUT(
     const updatedProject = await AdminService.upsertProject(payload);
 
     try {
-      revalidatePath('/');
+      revalidatePath('/', 'layout');
       revalidatePath('/admin/projects');
       revalidatePath('/admin/dashboard');
+      revalidatePath('/admin/sections');
     } catch {
       // Non-blocking revalidation
     }
@@ -269,9 +270,10 @@ export async function DELETE(
     await AdminService.deleteProject(id);
 
     try {
-      revalidatePath('/');
+      revalidatePath('/', 'layout');
       revalidatePath('/admin/projects');
       revalidatePath('/admin/dashboard');
+      revalidatePath('/admin/sections');
     } catch {
       // Non-blocking revalidation
     }

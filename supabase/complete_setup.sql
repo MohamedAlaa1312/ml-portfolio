@@ -148,13 +148,18 @@ CREATE TABLE IF NOT EXISTS public.projects (
     live_url TEXT,
     featured BOOLEAN NOT NULL DEFAULT false,
     display_order INT NOT NULL DEFAULT 0,
+    enabled BOOLEAN NOT NULL DEFAULT true,
     status publish_status NOT NULL DEFAULT 'draft',
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
 );
 
+-- Idempotent column addition if projects table already exists in Supabase
+ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT true;
+
 CREATE INDEX IF NOT EXISTS idx_projects_order ON public.projects (display_order ASC);
 CREATE INDEX IF NOT EXISTS idx_projects_status ON public.projects (status);
+CREATE INDEX IF NOT EXISTS idx_projects_status_enabled ON public.projects (status, enabled);
 CREATE INDEX IF NOT EXISTS idx_projects_featured ON public.projects (featured);
 
 -- 7. SKILLS TABLE

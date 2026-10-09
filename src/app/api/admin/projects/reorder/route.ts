@@ -32,9 +32,10 @@ export async function POST(request: Request) {
     await AdminService.reorderProjects(orderedIds);
 
     try {
-      revalidatePath('/');
+      revalidatePath('/', 'layout');
       revalidatePath('/admin/projects');
       revalidatePath('/admin/dashboard');
+      revalidatePath('/admin/sections');
     } catch {
       // Non-blocking revalidation
     }

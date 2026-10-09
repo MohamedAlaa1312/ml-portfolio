@@ -176,9 +176,10 @@ export async function POST(request: Request) {
     const newProject = await AdminService.upsertProject(payload);
 
     try {
-      revalidatePath('/');
+      revalidatePath('/', 'layout');
       revalidatePath('/admin/projects');
       revalidatePath('/admin/dashboard');
+      revalidatePath('/admin/sections');
     } catch {
       // Non-blocking revalidation
     }

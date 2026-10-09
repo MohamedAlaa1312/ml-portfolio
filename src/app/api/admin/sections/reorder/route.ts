@@ -32,8 +32,10 @@ export async function POST(request: Request) {
     const updatedSections = await AdminService.reorderSections(orderedIds);
 
     try {
-      revalidatePath('/');
+      revalidatePath('/', 'layout');
       revalidatePath('/admin/sections');
+      revalidatePath('/admin/dashboard');
+      revalidatePath('/admin/projects');
     } catch {
       // non-blocking
     }
