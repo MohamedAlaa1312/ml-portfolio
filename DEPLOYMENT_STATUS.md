@@ -11,7 +11,7 @@ This document provides the authoritative tracking record of the production deplo
 | **Deployment Date** | October 8, 2026 |
 | **Deployment Method** | GitHub Continuous Deployment (`main` branch -> Vercel Production) |
 | **Source Branch** | `main` |
-| **Commit Reference** | `9c20184` (`feat(seo): set identity to Mohamed Alaa and add MA emblem social sharing preview image`) |
+| **Commit Reference** | `11bfb0a` (`fix(projects): resolve schema mismatch, strip id on update, map enabled status, and purge cache across layout`) |
 | **GitHub Remote** | `https://github.com/MohamedAlaa1312/ml-portfolio` |
 | **Production URL** | `https://ml-portfolio-theta.vercel.app` |
 | **Deployment Status** | **DEPLOYED & LIVE (HTTP 200 Verified)** |
