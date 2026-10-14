@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 
 export interface ActivityItem {
   id: string;
-  type: 'project' | 'experience' | 'certification' | 'setting' | 'media';
+  type: 'project' | 'experience' | 'certification' | 'setting' | 'media' | 'message';
   title: string;
   detail: string;
   timestamp: string;
@@ -19,6 +19,7 @@ const typeIcons: Record<ActivityItem['type'], string> = {
   certification: '📜',
   setting: '⚙️',
   media: '🖼️',
+  message: '📩',
 };
 
 const defaultActivities: ActivityItem[] = [

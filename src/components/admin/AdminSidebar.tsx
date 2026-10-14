@@ -21,7 +21,7 @@ const navItems: NavItem[] = [
   { label: 'Skills', href: '/admin/skills', icon: '🛠️', isImplemented: true },
   { label: 'Projects', href: '/admin/projects', icon: '🚀', isImplemented: true },
   { label: 'Certifications', href: '/admin/certifications', icon: '📜', isImplemented: true },
-  { label: 'Contact', href: '/admin/contact', icon: '✉️', isImplemented: true },
+  { label: 'Contact & Inbox', href: '/admin/contact', icon: '✉️', isImplemented: true },
   { label: 'Sections', href: '/admin/sections', icon: '📑', isImplemented: true },
   { label: 'Publishing', href: '/admin/publishing', icon: '🌐', isImplemented: true },
   { label: 'Media', href: '/admin/media', icon: '🖼️', isImplemented: true },

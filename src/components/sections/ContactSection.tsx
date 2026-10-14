@@ -43,17 +43,33 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ content, setting
   const [formData, setFormData] = useState({ name: '', email: '', message: '' });
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setErrorMessage(null);
 
-    // Simulate sending message
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      const res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to send message.');
+      }
+
       setSubmitted(true);
       setFormData({ name: '', email: '', message: '' });
-    }, 800);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Transmission failed';
+      setErrorMessage(msg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const hasDirectDetails = Boolean(email || phone || location || availabilityText || (ctaText && ctaUrl));
@@ -243,6 +259,20 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ content, setting
                 value={formData.message}
                 onChange={(e) => setFormData({ ...formData, message: e.target.value })}
               />
+
+              {errorMessage && (
+                <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-xs">
+                  <p>{errorMessage}</p>
+                  {email && (
+                    <a
+                      href={`mailto:${email}?subject=Direct Inquiry from ${encodeURIComponent(formData.name || 'Visitor')}&body=${encodeURIComponent(formData.message)}`}
+                      className="underline mt-1 inline-block text-amber-400 hover:text-amber-300 font-mono"
+                    >
+                      Click here to send directly via email client instead →
+                    </a>
+                  )}
+                </div>
+              )}
 
               <Button
                 type="submit"

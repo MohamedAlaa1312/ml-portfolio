@@ -4,3 +4,4 @@ export { SocialList } from './SocialList';
 export { SocialFormModal } from './SocialFormModal';
 export { SocialDeleteModal } from './SocialDeleteModal';
 export { ContactPreview } from './ContactPreview';
+export { MessagesInbox } from './MessagesInbox';

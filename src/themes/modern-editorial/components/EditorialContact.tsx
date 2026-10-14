@@ -30,15 +30,33 @@ export const EditorialContact: React.FC<ThemeContactProps> = ({ content, setting
   const [formData, setFormData] = useState({ name: '', email: '', message: '' });
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    setErrorMessage(null);
+
+    try {
+      const res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to transmit message.');
+      }
+
       setSubmitted(true);
       setFormData({ name: '', email: '', message: '' });
-    }, 600);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Transmission failed';
+      setErrorMessage(msg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const hasDirectDetails = Boolean(email || phone || location || availabilityText || (ctaText && ctaUrl));
@@ -240,6 +258,12 @@ export const EditorialContact: React.FC<ThemeContactProps> = ({ content, setting
                 />
               </div>
 
+              {errorMessage && (
+                <div className="p-2.5 rounded bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-mono">
+                  {errorMessage}
+                </div>
+              )}
+
               <button
                 type="submit"
                 disabled={loading}
@@ -247,6 +271,17 @@ export const EditorialContact: React.FC<ThemeContactProps> = ({ content, setting
               >
                 {loading ? 'Transmitting...' : submitButtonText}
               </button>
+
+              {email && (
+                <div className="text-center pt-1">
+                  <a
+                    href={`mailto:${email}?subject=Project%20Inquiry%20from%20${encodeURIComponent(formData.name || 'Portfolio Visitor')}&body=${encodeURIComponent(formData.message)}`}
+                    className="text-[11px] font-mono text-[#71717A] hover:text-[#EDEDEC] transition-colors underline"
+                  >
+                    Or open in external email client ↗
+                  </a>
+                </div>
+              )}
             </form>
           )}
         </div>

@@ -7,24 +7,27 @@ import { SocialList } from './SocialList';
 import { SocialFormModal } from './SocialFormModal';
 import { SocialDeleteModal } from './SocialDeleteModal';
 import { ContactPreview } from './ContactPreview';
-import type { ContactContent, Section, SiteSettings, SocialLinkItem } from '@/lib/supabase/types';
+import { MessagesInbox } from './MessagesInbox';
+import type { ContactContent, Section, SiteSettings, SocialLinkItem, ContactMessage } from '@/lib/supabase/types';
 
 interface ContactSocialManagerProps {
   initialSettings: SiteSettings | null;
   initialSection: Section | null;
   initialSocialLinks: SocialLinkItem[];
+  initialMessages?: ContactMessage[];
 }
 
 export const ContactSocialManager: React.FC<ContactSocialManagerProps> = ({
   initialSettings,
   initialSection,
   initialSocialLinks,
+  initialMessages = [],
 }) => {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  // Active tab state (defaults to 'contact', switches to 'social' if ?tab=social)
-  const [activeTab, setActiveTab] = useState<'contact' | 'social'>('contact');
+  // Active tab state (defaults to 'contact', switches to 'social' or 'messages' if requested)
+  const [activeTab, setActiveTab] = useState<'contact' | 'social' | 'messages'>('contact');
 
   useEffect(() => {
     const tabParam = searchParams.get('tab');
@@ -32,10 +35,12 @@ export const ContactSocialManager: React.FC<ContactSocialManagerProps> = ({
       setActiveTab('social');
     } else if (tabParam === 'contact') {
       setActiveTab('contact');
+    } else if (tabParam === 'messages' || tabParam === 'inbox') {
+      setActiveTab('messages');
     }
   }, [searchParams]);
 
-  const handleTabChange = (tab: 'contact' | 'social') => {
+  const handleTabChange = (tab: 'contact' | 'social' | 'messages') => {
     setActiveTab(tab);
     const params = new URLSearchParams(searchParams.toString());
     params.set('tab', tab);
@@ -260,39 +265,67 @@ export const ContactSocialManager: React.FC<ContactSocialManagerProps> = ({
             {activeSocials}/{totalSocials}
           </span>
         </button>
+
+        <button
+          type="button"
+          onClick={() => handleTabChange('messages')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-mono transition-all min-h-[40px] ${
+            activeTab === 'messages'
+              ? 'bg-amber-500/15 text-amber-400 font-bold border border-amber-500/30 shadow-md'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+          }`}
+        >
+          <span>📥</span>
+          <span>Inquiries & Messages</span>
+          {initialMessages.filter((m) => !m.read).length > 0 ? (
+            <span className="px-1.5 py-0.5 rounded-md bg-amber-500/20 text-[10px] text-amber-400 font-mono font-bold border border-amber-500/40">
+              {initialMessages.filter((m) => !m.read).length} new
+            </span>
+          ) : (
+            <span className="px-1.5 py-0.5 rounded-md bg-white/10 text-[10px] text-slate-400 font-mono">
+              {initialMessages.length}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* Main Content Area */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start">
-        {/* Active Tab Panel */}
-        <div className="lg:col-span-8 space-y-6">
-          {activeTab === 'contact' ? (
-            <ContactForm
-              initialSettings={settings}
-              initialSection={section}
-              onSaveSuccess={refreshData}
-            />
-          ) : (
-            <SocialList
-              links={socialLinks}
-              onAddClick={handleOpenAdd}
-              onEditClick={handleOpenEdit}
-              onDeleteClick={handleOpenDelete}
-              onToggleEnabled={handleToggleEnabled}
-              onMoveOrder={handleMoveOrder}
-            />
-          )}
+      {activeTab === 'messages' ? (
+        <div className="w-full">
+          <MessagesInbox initialMessages={initialMessages} />
         </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start">
+          {/* Active Tab Panel */}
+          <div className="lg:col-span-8 space-y-6">
+            {activeTab === 'contact' ? (
+              <ContactForm
+                initialSettings={settings}
+                initialSection={section}
+                onSaveSuccess={refreshData}
+              />
+            ) : (
+              <SocialList
+                links={socialLinks}
+                onAddClick={handleOpenAdd}
+                onEditClick={handleOpenEdit}
+                onDeleteClick={handleOpenDelete}
+                onToggleEnabled={handleToggleEnabled}
+                onMoveOrder={handleMoveOrder}
+              />
+            )}
+          </div>
 
-        {/* Live Public Preview Panel */}
-        <div className="lg:col-span-4 sticky top-6">
-          <ContactPreview
-            settings={settings}
-            section={section}
-            socialLinks={socialLinks}
-          />
+          {/* Live Public Preview Panel */}
+          <div className="lg:col-span-4 sticky top-6">
+            <ContactPreview
+              settings={settings}
+              section={section}
+              socialLinks={socialLinks}
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Reusable Social Form Modal (Create / Edit) */}
       <SocialFormModal

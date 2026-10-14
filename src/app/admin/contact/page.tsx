@@ -30,11 +30,12 @@ export default async function AdminContactPage() {
     // Fallback email
   }
 
-  // 3. Load Contact and Social Data in Parallel
-  const [siteSettings, contactSection, socialLinks] = await Promise.all([
+  // 3. Load Contact and Social Data and Received Inquiries in Parallel
+  const [siteSettings, contactSection, socialLinks, contactMessages] = await Promise.all([
     AdminService.getSiteSettings(),
     AdminService.getContactSection(),
     AdminService.getSocialLinks(),
+    AdminService.getContactMessages(),
   ]);
 
   return (
@@ -43,6 +44,7 @@ export default async function AdminContactPage() {
         initialSettings={siteSettings}
         initialSection={contactSection}
         initialSocialLinks={socialLinks}
+        initialMessages={contactMessages}
       />
     </AdminLayout>
   );

@@ -33,15 +33,33 @@ export const MonochromeContact: React.FC<ThemeContactProps> = ({
   const [formData, setFormData] = useState({ name: '', email: '', message: '' });
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    setErrorMessage(null);
+
+    try {
+      const res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to transmit message.');
+      }
+
       setSubmitted(true);
       setFormData({ name: '', email: '', message: '' });
-    }, 400);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Transmission failed';
+      setErrorMessage(msg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const hasDirectDetails = Boolean(email || phone || location || availabilityText || (ctaText && ctaUrl));
@@ -236,6 +254,12 @@ export const MonochromeContact: React.FC<ThemeContactProps> = ({
                 />
               </div>
 
+              {errorMessage && (
+                <div className="p-2.5 bg-neutral-900 border border-neutral-700 text-neutral-300 text-xs font-mono">
+                  {errorMessage}
+                </div>
+              )}
+
               <button
                 type="submit"
                 disabled={loading}
@@ -243,6 +267,17 @@ export const MonochromeContact: React.FC<ThemeContactProps> = ({
               >
                 {loading ? 'TRANSMITTING...' : submitButtonText}
               </button>
+
+              {email && (
+                <div className="text-center pt-1">
+                  <a
+                    href={`mailto:${email}?subject=Project%20Inquiry%20from%20${encodeURIComponent(formData.name || 'Portfolio Visitor')}&body=${encodeURIComponent(formData.message)}`}
+                    className="text-[10px] font-mono text-neutral-500 hover:text-white transition-colors underline"
+                  >
+                    OR OPEN EXTERNAL EMAIL CLIENT ↗
+                  </a>
+                </div>
+              )}
             </form>
           )}
         </div>

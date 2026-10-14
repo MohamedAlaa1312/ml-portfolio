@@ -13,8 +13,11 @@ import type {
   MediaItem,
   MediaUsageReference,
   MediaItemWithUsage,
+  ContactMessage,
 } from './supabase/types';
 import { parseSocialLinks } from './social-utils';
+import fs from 'fs';
+import path from 'path';
 
 /**
  * Resilient In-Memory & Local Development Store
@@ -35,6 +38,7 @@ declare global {
         certifications?: Certification[];
         drafts?: CmsDraft[];
         media?: MediaItem[];
+        contactMessages?: ContactMessage[];
       }
     | undefined;
 }
@@ -2090,6 +2094,78 @@ export const DevFallbackStore = {
       imagesCount: totalImages,
       documentsCount: totalDocuments,
     };
+  },
+
+  getContactMessagesList(): ContactMessage[] {
+    if (!global.__portfolioStore) return [];
+    if (!global.__portfolioStore.contactMessages) {
+      global.__portfolioStore.contactMessages = [];
+      try {
+        const filePath = path.join(process.cwd(), 'data', 'contact_messages.json');
+        if (fs.existsSync(filePath)) {
+          const raw = fs.readFileSync(filePath, 'utf8');
+          global.__portfolioStore.contactMessages = JSON.parse(raw);
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return global.__portfolioStore.contactMessages || [];
+  },
+
+  saveContactMessagesToDisk() {
+    try {
+      const dir = path.join(process.cwd(), 'data');
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      const filePath = path.join(dir, 'contact_messages.json');
+      fs.writeFileSync(filePath, JSON.stringify(this.getContactMessagesList(), null, 2), 'utf8');
+    } catch {
+      // non-blocking
+    }
+  },
+
+  getAllContactMessages(): ContactMessage[] {
+    return [...this.getContactMessagesList()].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+  },
+
+  createContactMessage(msg: Partial<ContactMessage>): ContactMessage {
+    const list = this.getContactMessagesList();
+    const created: ContactMessage = {
+      id: msg.id || `msg-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      name: msg.name?.trim() || 'Anonymous',
+      email: msg.email?.trim() || 'no-email@provided.com',
+      subject: msg.subject?.trim() || 'General Inquiry',
+      message: msg.message?.trim() || '',
+      read: false,
+      created_at: new Date().toISOString(),
+    };
+    list.unshift(created);
+    this.saveContactMessagesToDisk();
+    return created;
+  },
+
+  deleteContactMessage(id: string): boolean {
+    const list = this.getContactMessagesList();
+    const idx = list.findIndex((m) => m.id === id);
+    if (idx >= 0) {
+      list.splice(idx, 1);
+      this.saveContactMessagesToDisk();
+      return true;
+    }
+    return false;
+  },
+
+  markContactMessageRead(id: string, read = true): boolean {
+    const list = this.getContactMessagesList();
+    const item = list.find((m) => m.id === id);
+    if (item) {
+      item.read = read;
+      this.saveContactMessagesToDisk();
+      return true;
+    }
+    return false;
   },
 };
 

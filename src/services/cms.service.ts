@@ -200,7 +200,13 @@ export const CmsService = {
         console.warn('[CmsService.getPublishedCertifications] Error:', error.message);
         return DevFallbackStore.getPublishedCertifications();
       }
-      return (data as Certification[]) || DevFallbackStore.getPublishedCertifications();
+      if (Array.isArray(data)) {
+        return data.map((row: any) => ({
+          ...row,
+          enabled: row.enabled !== undefined ? Boolean(row.enabled) : row.status === 'published',
+        })) as Certification[];
+      }
+      return DevFallbackStore.getPublishedCertifications();
     } catch (err) {
       console.warn('[CmsService.getPublishedCertifications] Connection error:', err);
       return DevFallbackStore.getPublishedCertifications();

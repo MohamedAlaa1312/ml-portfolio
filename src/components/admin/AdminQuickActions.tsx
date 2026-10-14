@@ -58,6 +58,12 @@ const quickActions: QuickAction[] = [
     href: '/admin/contact',
   },
   {
+    label: 'Received Inquiries',
+    icon: '📥',
+    description: 'Read and reply to direct client & recruiter messages.',
+    href: '/admin/contact?tab=messages',
+  },
+  {
     label: 'Manage Section Order & Visibility',
     icon: '📑',
     description: 'Reorder portfolio sections and toggle visibility for public visitors.',

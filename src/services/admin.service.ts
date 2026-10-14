@@ -19,6 +19,7 @@ import type {
   CmsDraft,
   DraftEntityType,
   PublishStatus,
+  ContactMessage,
 } from '@/lib/supabase/types';
 import { parseSocialLinks } from '@/lib/social-utils';
 
@@ -947,7 +948,10 @@ export const AdminService = {
         return DevFallbackStore.getAllCertifications();
       }
       if (Array.isArray(data) && data.length > 0) {
-        return data as Certification[];
+        return data.map((row: any) => ({
+          ...row,
+          enabled: row.enabled !== undefined ? Boolean(row.enabled) : row.status === 'published',
+        })) as Certification[];
       }
       return DevFallbackStore.getAllCertifications();
     } catch (err) {
@@ -988,7 +992,7 @@ export const AdminService = {
     }
     try {
       const supabase = await getDbClient();
-      const payload: any = { ...cert, updated_at: new Date().toISOString() };
+      const payload: any = { ...cert };
 
       let existing: any = null;
       if (isValidUuid(payload.id)) {
@@ -999,24 +1003,61 @@ export const AdminService = {
         existing = data;
       }
 
-      if (!isValidUuid(payload.id)) {
-        delete payload.id;
+      // Authoritative status resolution: map enabled boolean to publish_status enum
+      let finalStatus: PublishStatus = payload.status || 'published';
+      if (payload.enabled === false) {
+        finalStatus = finalStatus === 'archived' ? 'archived' : 'draft';
+      } else if (payload.enabled === true && finalStatus === 'draft') {
+        finalStatus = 'published';
       }
+
+      // Format issue_date to YYYY-MM-DD
+      let formattedIssueDate = payload.issue_date ? String(payload.issue_date).trim() : '';
+      if (!formattedIssueDate || isNaN(new Date(formattedIssueDate).getTime())) {
+        formattedIssueDate = new Date().toISOString().split('T')[0];
+      } else {
+        formattedIssueDate = new Date(formattedIssueDate).toISOString().split('T')[0];
+      }
+
+      const cleanImage = payload.image_url?.trim() || payload.image?.trim() || null;
+
+      // Build clean database payload strictly matching columns in PostgreSQL `certifications` table
+      const dbPayload: Record<string, any> = {
+        title: payload.title?.trim() ?? 'Untitled Certification',
+        issuer: payload.issuer?.trim() ?? 'Self-Issued',
+        issue_date: formattedIssueDate,
+        credential_id: payload.credential_id ? String(payload.credential_id).trim() : null,
+        credential_url: payload.credential_url ? String(payload.credential_url).trim() : null,
+        image: cleanImage,
+        image_url: cleanImage,
+        description: payload.description ? String(payload.description).trim() : '',
+        display_order: typeof payload.display_order === 'number' ? payload.display_order : 0,
+        status: finalStatus,
+        updated_at: new Date().toISOString(),
+      };
+
+      // Strip any undefined keys
+      Object.keys(dbPayload).forEach((k) => {
+        if (dbPayload[k] === undefined) delete dbPayload[k];
+      });
 
       let res;
       if (existing?.id) {
-        const updatePayload = { ...payload };
-        delete updatePayload.id;
+        // UPDATE existing row: strictly DO NOT pass `id` in payload
         res = await (supabase as any)
           .from('certifications')
-          .update(updatePayload)
+          .update(dbPayload)
           .eq('id', existing.id)
           .select()
           .single();
       } else {
+        // INSERT new row: only attach id if it is a valid UUID
+        if (isValidUuid(payload.id)) {
+          dbPayload.id = payload.id;
+        }
         res = await (supabase as any)
           .from('certifications')
-          .insert(payload)
+          .insert(dbPayload)
           .select()
           .single();
       }
@@ -1025,7 +1066,11 @@ export const AdminService = {
         console.error('[AdminService.upsertCertification] DB error:', res.error.message);
         throw new Error(res.error.message);
       }
-      const resultData = res.data as Certification;
+      const row = res.data as any;
+      const resultData: Certification = {
+        ...row,
+        enabled: row.enabled !== undefined ? Boolean(row.enabled) : row.status === 'published',
+      };
       DevFallbackStore.upsertCertification(resultData);
       return resultData;
     } catch (err) {
@@ -1913,5 +1958,81 @@ export const AdminService = {
       fileSize: file.size,
       mimeType: file.type,
     };
+  },
+
+  // ----------------------------------------------------------------------------
+  // CONTACT MESSAGES & INQUIRIES
+  // ----------------------------------------------------------------------------
+  async getContactMessages(): Promise<ContactMessage[]> {
+    if (!DevFallbackStore.isConfigured()) {
+      return DevFallbackStore.getAllContactMessages();
+    }
+    try {
+      const supabase = await getDbClient();
+      const { data, error } = await supabase
+        .from('contact_messages')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        return DevFallbackStore.getAllContactMessages();
+      }
+      return (data as ContactMessage[]) || DevFallbackStore.getAllContactMessages();
+    } catch {
+      return DevFallbackStore.getAllContactMessages();
+    }
+  },
+
+  async saveContactMessage(msg: Partial<ContactMessage>): Promise<ContactMessage> {
+    const savedFallback = DevFallbackStore.createContactMessage(msg);
+    if (!DevFallbackStore.isConfigured()) {
+      return savedFallback;
+    }
+    try {
+      const supabase = await getDbClient();
+      const { data, error } = await (supabase as any)
+        .from('contact_messages')
+        .insert({
+          name: msg.name?.trim() || 'Anonymous',
+          email: msg.email?.trim() || 'anonymous@domain.com',
+          subject: msg.subject?.trim() || 'General Inquiry',
+          message: msg.message?.trim() || '',
+          read: false,
+          created_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (!error && data) {
+        return data as ContactMessage;
+      }
+      return savedFallback;
+    } catch {
+      return savedFallback;
+    }
+  },
+
+  async deleteContactMessage(id: string): Promise<void> {
+    DevFallbackStore.deleteContactMessage(id);
+    if (DevFallbackStore.isConfigured() && isValidUuid(id)) {
+      try {
+        const supabase = await getDbClient();
+        await supabase.from('contact_messages').delete().eq('id', id);
+      } catch {
+        // non-blocking
+      }
+    }
+  },
+
+  async markContactMessageRead(id: string, read = true): Promise<void> {
+    DevFallbackStore.markContactMessageRead(id, read);
+    if (DevFallbackStore.isConfigured() && isValidUuid(id)) {
+      try {
+        const supabase = await getDbClient();
+        await (supabase as any).from('contact_messages').update({ read }).eq('id', id);
+      } catch {
+        // non-blocking
+      }
+    }
   },
 };

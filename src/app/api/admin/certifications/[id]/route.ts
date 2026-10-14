@@ -199,8 +199,14 @@ export async function PUT(
 
     const updated = await AdminService.upsertCertification(payload);
 
-    revalidatePath('/');
-    revalidatePath('/admin/certifications');
+    try {
+      revalidatePath('/', 'layout');
+      revalidatePath('/');
+      revalidatePath('/admin/certifications');
+      revalidatePath('/admin/dashboard');
+    } catch {
+      // Non-blocking
+    }
 
     return NextResponse.json({
       success: true,

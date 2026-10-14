@@ -276,6 +276,16 @@ export interface Certification {
   updated_at: string;
 }
 
+export interface ContactMessage {
+  id: string;
+  name: string;
+  email: string;
+  subject?: string | null;
+  message: string;
+  read?: boolean;
+  created_at: string;
+}
+
 export interface MediaItem {
   id: string;
   file_name: string;

@@ -32,6 +32,7 @@ export async function POST(request: Request) {
     await AdminService.reorderCertifications(orderedIds);
 
     try {
+      revalidatePath('/', 'layout');
       revalidatePath('/');
       revalidatePath('/admin/certifications');
       revalidatePath('/admin/dashboard');
